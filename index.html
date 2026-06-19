@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Story Diagnosis</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  Babel.registerPreset('jsx-classic', {
+    presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]]
+  });
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia', serif; background: #faf9f6; color: #1a1a1a; }
+  .app { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  .diag-form { display: flex; flex-direction: column; gap: 20px; }
+  .form-top { text-align: center; margin-bottom: 8px; }
+  h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; color: #111; }
+  .form-subtitle { color: #555; font-size: 1rem; line-height: 1.6; margin-bottom: 14px; }
+  .btn-sample { background: none; border: 1px dashed #aaa; color: #666; font-size: 0.85rem; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; }
+  .btn-sample:hover { border-color: #555; color: #333; }
+  .form-row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 520px) { .form-row.two { grid-template-columns: 1fr; } }
+  label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; font-weight: 600; color: #333; font-family: 'Helvetica Neue', sans-serif; }
+  label.full { width: 100%; }
+  input, select, textarea { font-family: 'Georgia', serif; font-size: 0.95rem; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; background: #fff; color: #111; outline: none; resize: vertical; transition: border-color 0.15s; }
+  input:focus, select:focus, textarea:focus { border-color: #6366f1; }
+  .form-error { color: #dc2626; font-size: 0.9rem; font-family: sans-serif; }
+  .btn-primary { background: #1a1a1a; color: #fff; border: none; border-radius: 10px; padding: 14px 28px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Helvetica Neue', sans-serif; letter-spacing: 0.2px; transition: background 0.15s, transform 0.1s; }
+  .btn-primary:hover:not(:disabled) { background: #333; }
+  .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-submit { margin-top: 8px; }
+
+  .result-card { margin-top: 48px; display: flex; flex-direction: column; gap: 28px; }
+  .result-header { display: flex; align-items: center; gap: 24px; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; }
+  @media (max-width: 480px) { .result-header { flex-direction: column; text-align: center; } }
+  .result-header-text h2 { font-size: 1.4rem; margin-bottom: 8px; }
+  .verdict { color: #444; font-size: 0.95rem; line-height: 1.6; margin-bottom: 12px; }
+  .score-ring-wrap { flex-shrink: 0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 560px) { .two-col { grid-template-columns: 1fr; } }
+  section { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
+  h3 { font-size: 0.95rem; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 12px; }
+  ul, ol { padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+  li { font-size: 0.95rem; line-height: 1.5; color: #333; }
+  .missing-list { list-style: none; padding-left: 0; }
+  .missing-item { font-weight: 600; display: block; color: #111; }
+  .fix-label { color: #6366f1; font-weight: 700; font-size: 0.85rem; }
+  .fix-text { color: #444; font-size: 0.9rem; }
+  .comparables { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
+  .title-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { background: #f3f4f6; border-radius: 999px; padding: 5px 14px; font-size: 0.88rem; color: #374151; font-family: sans-serif; }
+  .upgrade-prompt { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; color: #166534; font-size: 0.95rem; line-height: 1.5; }
+  .coach-btn { align-self: center; margin-top: 8px; }
+
+  .coach-panel { margin-top: 48px; border-top: 2px solid #1a1a1a; padding-top: 32px; }
+  .coach-panel h2 { font-size: 1.5rem; margin-bottom: 6px; }
+  .coach-subtitle { color: #666; font-size: 0.95rem; margin-bottom: 20px; }
+  .quick-starts { margin-bottom: 24px; }
+  .qs-label { font-family: sans-serif; font-size: 0.85rem; color: #888; margin-bottom: 10px; }
+  .qs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) { .qs-grid { grid-template-columns: 1fr; } }
+  .qs-btn { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; font-family: 'Georgia', serif; color: #333; cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s; }
+  .qs-btn:hover:not(:disabled) { border-color: #6366f1; background: #f5f3ff; }
+  .qs-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chat-messages { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; max-height: 520px; overflow-y: auto; padding-right: 4px; }
+  .msg { border-radius: 12px; padding: 16px 18px; }
+  .msg-user { background: #f3f4f6; }
+  .msg-assistant { background: #fff; border: 1px solid #e5e7eb; }
+  .msg-label { display: block; font-family: sans-serif; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 6px; }
+  .msg p { font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; color: #222; }
+  .thinking { color: #9ca3af !important; font-style: italic; }
+
+  .paywall-card { background: #fff; border: 2px solid #1a1a1a; border-radius: 16px; padding: 32px; text-align: center; margin: 8px 0; }
+  .paywall-inner { max-width: 380px; margin: 0 auto; }
+  .paywall-card h3 { font-size: 1.3rem; margin-bottom: 10px; }
+  .paywall-card p { color: #444; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; }
+  .btn-paypal { display: inline-block; background: #003087; color: #fff; text-decoration: none; border-radius: 10px; padding: 13px 32px; font-weight: 700; font-size: 1rem; font-family: sans-serif; margin-bottom: 16px; transition: background 0.15s; }
+  .btn-paypal:hover { background: #001f5b; }
+  .paywall-note { font-size: 0.85rem !important; color: #888 !important; margin-bottom: 12px !important; }
+  .btn-confirm { background: none; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 20px; font-size: 0.9rem; color: #555; cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s; }
+  .btn-confirm:hover { border-color: #22c55e; color: #15803d; }
+
+  .chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+  .chat-input { flex: 1; resize: none; border-radius: 10px; font-family: 'Georgia', serif; }
+  .btn-send { background: #1a1a1a; color: #fff; border: none; border-radius: 10px; padding: 12px 20px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: sans-serif; white-space: nowrap; transition: background 0.15s; height: fit-content; }
+  .btn-send:hover:not(:disabled) { background: #333; }
+  .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="jsx-classic">
+const { useState, useRef, useEffect } = React;
+
+const PAYPAL_URL = "https://www.paypal.com/ncp/payment/5343AJGX52X52";
+
+const GENRES = [
+  "Literary Fiction","Commercial Fiction","Historical Fiction","Romance",
+  "Thriller / Suspense","Mystery","Horror","Science Fiction","Fantasy",
+  "Young Adult","Middle Grade","Memoir / Narrative Nonfiction","Other",
+];
+const STAGES = [
+  "Just an idea","Outline / planning","First draft in progress",
+  "First draft complete","Revising",
+];
+const SAMPLE = {
+  genre: "Literary Fiction",
+  stage: "First draft in progress",
+  premise: "A retired schoolteacher in a small Philippine fishing town discovers a box of unsent love letters she wrote fifty years ago to a man who moved abroad. As she rereads them, she must decide whether to finally send them—and confront the life she chose instead.",
+  protagonist: "Lola Caring, 72, sharp-tongued, proud, quietly lonely. Taught high school English for forty years. Keeps her feelings folded up like old paper.",
+  conflict: "External: the man, Dante, is dying and his daughter has tracked Lola Caring down. Internal: admitting she made the wrong choice and wasted her emotional life on silence.",
+  stakes: "If she sends the letters, she risks her carefully constructed peace and reopens grief. If she doesn't, she dies with the truth unspoken—and so does he.",
+  theme: "The cost of silence. Whether it is ever too late to tell the truth.",
+};
+
+async function apiFetch(endpoint, body) {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+  return data;
+}
+
+function ScoreRing({ score }) {
+  const r = 52, circ = 2 * Math.PI * r, filled = (score / 100) * circ;
+  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const label = score >= 75 ? "Strong" : score >= 50 ? "Developing" : "Needs Work";
+  return (
+    <div className="score-ring-wrap">
+      <svg width="128" height="128" viewBox="0 0 128 128">
+        <circle cx="64" cy="64" r={r} fill="none" stroke="#e5e7eb" strokeWidth="10" />
+        <circle cx="64" cy="64" r={r} fill="none" stroke={color} strokeWidth="10"
+          strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+          transform="rotate(-90 64 64)" style={{ transition: "stroke-dasharray 1s ease" }} />
+        <text x="64" y="60" textAnchor="middle" dominantBaseline="middle" fontSize="26" fontWeight="700" fill={color}>{score}</text>
+        <text x="64" y="82" textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#6b7280">{label}</text>
+      </svg>
+    </div>
+  );
+}
+
+function GreenLightBadge({ verdict }) {
+  const map = {
+    "Write It Now": { bg: "#dcfce7", color: "#15803d", icon: "✦" },
+    "Develop Further First": { bg: "#fef9c3", color: "#854d0e", icon: "◈" },
+    "Major Rethink Needed": { bg: "#fee2e2", color: "#991b1b", icon: "◉" },
+  };
+  const v = map[verdict] || map["Develop Further First"];
+  return (
+    <span style={{ background: v.bg, color: v.color, padding: "4px 14px", borderRadius: "999px",
+      fontWeight: 700, fontSize: "0.9rem", display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {v.icon} {verdict}
+    </span>
+  );
+}
+
+const QUICK_STARTS = [
+  { id: "opening", label: "Write my opening paragraph",
+    prompt: "Write a compelling opening paragraph for my story. Make it hook the reader immediately and establish voice." },
+  { id: "outline", label: "Outline Chapter 1",
+    prompt: "Create a detailed scene-by-scene outline for Chapter 1 of my story. Include what happens, whose POV, and the emotional arc of each scene." },
+  { id: "scene", label: "Write my first scene",
+    prompt: "Write the first full scene of my story — the moment before everything changes. Show don't tell. 400–600 words." },
+  { id: "dialogue", label: "Write my first dialogue line",
+    prompt: "Write the first piece of dialogue in my story. Make it reveal character and create immediate tension or intrigue." },
+];
+
+function WriteHelper({ storyData }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [freeUsed, setFreeUsed] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, paywallVisible]);
+
+  async function send(userText) {
+    if (!userText.trim() || loading) return;
+    if (!unlocked && freeUsed) { setPaywallVisible(true); return; }
+
+    const newMessages = [...messages, { role: "user", content: userText }];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
+    try {
+      const { reply } = await apiFetch('/api/coach', { messages: newMessages, storyData });
+      setMessages([...newMessages, { role: "assistant", content: reply }]);
+      if (!freeUsed) { setFreeUsed(true); if (!unlocked) setPaywallVisible(true); }
+    } catch (e) {
+      setMessages([...newMessages, { role: "assistant", content: `Error: ${e.message}. Please try again.` }]);
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div className="coach-panel">
+      <h2>Writing Coach</h2>
+      <p className="coach-subtitle">Your story, your voice — let's get words on the page.</p>
+
+      {messages.length === 0 && (
+        <div className="quick-starts">
+          <p className="qs-label">Quick starts:</p>
+          <div className="qs-grid">
+            {QUICK_STARTS.map(qs => (
+              <button key={qs.id} className="qs-btn" onClick={() => send(qs.prompt)} disabled={loading}>
+                {qs.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="chat-messages">
+        {messages.map((m, i) => (
+          <div key={i} className={`msg msg-${m.role}`}>
+            <span className="msg-label">{m.role === "user" ? "You" : "Coach"}</span>
+            <p>{m.content}</p>
+          </div>
+        ))}
+        {loading && <div className="msg msg-assistant"><span className="msg-label">Coach</span><p className="thinking">Writing…</p></div>}
+        <div ref={bottomRef} />
+      </div>
+
+      {paywallVisible && !unlocked && (
+        <div className="paywall-card">
+          <div className="paywall-inner">
+            <h3>Unlock the Full Session</h3>
+            <p>Your first response was free. Unlock unlimited coaching for this story for a one-time payment of <strong>$9</strong>.</p>
+            <a href={PAYPAL_URL} target="_blank" rel="noopener noreferrer" className="btn-paypal">Pay $9 via PayPal</a>
+            <p className="paywall-note">After payment, click below to continue your session.</p>
+            <button className="btn-confirm" onClick={() => { setUnlocked(true); setPaywallVisible(false); }}>
+              I've paid — unlock my session
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(!paywallVisible || unlocked) && (
+        <div className="chat-input-row">
+          <textarea className="chat-input"
+            placeholder={freeUsed && !unlocked ? "Unlock to continue writing…" : "Ask your coach anything about your story…"}
+            value={input} onChange={e => setInput(e.target.value)}
+            disabled={loading || (freeUsed && !unlocked)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
+            rows={3} />
+          <button className="btn-send" onClick={() => send(input)}
+            disabled={loading || !input.trim() || (freeUsed && !unlocked)}>
+            {loading ? "…" : "Send"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiagnosisResult({ result, storyData }) {
+  const [showCoach, setShowCoach] = useState(false);
+  return (
+    <div className="result-card">
+      <div className="result-header">
+        <ScoreRing score={result.viability_score} />
+        <div className="result-header-text">
+          <h2>{result.score_label}</h2>
+          <p className="verdict">{result.verdict}</p>
+          <GreenLightBadge verdict={result.green_light} />
+        </div>
+      </div>
+
+      <div className="two-col">
+        <section>
+          <h3>✓ What's Working</h3>
+          <ul>{result.working.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </section>
+        <section>
+          <h3>✗ What's Missing</h3>
+          <ul className="missing-list">
+            {result.missing.map((m, i) => (
+              <li key={i}>
+                <span className="missing-item">{m.issue}</span>
+                <span className="fix-label">Fix: </span>
+                <span className="fix-text">{m.fix}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      {result.comparable_titles?.length > 0 && (
+        <section className="comparables">
+          <h3>Comparable Titles</h3>
+          <div className="title-pills">
+            {result.comparable_titles.map((t, i) => <span key={i} className="pill">{t}</span>)}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <h3>Next Steps</h3>
+        <ol>{result.next_steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+      </section>
+
+      {result.upgrade_prompt && (
+        <div className="upgrade-prompt"><p>{result.upgrade_prompt}</p></div>
+      )}
+
+      <button className="btn-primary coach-btn" onClick={() => setShowCoach(true)}>
+        Start Writing with a Coach →
+      </button>
+
+      {showCoach && <WriteHelper storyData={storyData} />}
+    </div>
+  );
+}
+
+function DiagnosisForm({ onResult }) {
+  const [form, setForm] = useState({ genre:"", stage:"", premise:"", protagonist:"", conflict:"", stakes:"", theme:"" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  async function submit(e) {
+    e.preventDefault();
+    if (Object.values(form).some(v => !v.trim())) { setError("Please fill in all fields before submitting."); return; }
+    setError(""); setLoading(true);
+    try {
+      const result = await apiFetch('/api/diagnose', form);
+      onResult(result, form);
+    } catch (e) {
+      setError(e.message);
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <form className="diag-form" onSubmit={submit}>
+      <div className="form-top">
+        <h1>Story Diagnosis</h1>
+        <p className="form-subtitle">Get an honest assessment of your story's potential — free, instant, and specific to your concept.</p>
+        <button type="button" className="btn-sample" onClick={() => setForm(SAMPLE)}>Load sample story</button>
+      </div>
+
+      <div className="form-row two">
+        <label>Genre
+          <select value={form.genre} onChange={e => set("genre", e.target.value)} required>
+            <option value="">Select…</option>
+            {GENRES.map(g => <option key={g}>{g}</option>)}
+          </select>
+        </label>
+        <label>Writing Stage
+          <select value={form.stage} onChange={e => set("stage", e.target.value)} required>
+            <option value="">Select…</option>
+            {STAGES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {[
+        ["premise","Premise","What happens in your story? One or two sentences.",3],
+        ["protagonist","Protagonist","Who is your main character? What do they want and what's holding them back?",2],
+        ["conflict","Central Conflict","What's the main external and/or internal conflict?",2],
+        ["stakes","Stakes","What does your protagonist stand to lose or gain? Why does it matter?",2],
+        ["theme","Theme","What is your story really about beneath the plot?",2],
+      ].map(([field, lbl, placeholder, rows]) => (
+        <label key={field} className="full">{lbl}
+          <textarea rows={rows} placeholder={placeholder}
+            value={form[field]} onChange={e => set(field, e.target.value)} required />
+        </label>
+      ))}
+
+      {error && <p className="form-error">{error}</p>}
+      <button className="btn-primary btn-submit" type="submit" disabled={loading}>
+        {loading ? "Diagnosing your story…" : "Diagnose My Story →"}
+      </button>
+    </form>
+  );
+}
+
+function App() {
+  const [result, setResult] = useState(null);
+  const [storyData, setStoryData] = useState(null);
+  const resultRef = useRef(null);
+
+  function handleResult(parsed, form) {
+    setResult(parsed); setStoryData(form);
+    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  }
+
+  return (
+    <div className="app">
+      <DiagnosisForm onResult={handleResult} />
+      {result && <div ref={resultRef}><DiagnosisResult result={result} storyData={storyData} /></div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
