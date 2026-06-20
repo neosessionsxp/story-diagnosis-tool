@@ -858,12 +858,50 @@ function DiagnosisResults({ data, form, onCoach }) {
 
 // ── Paywall ─────────────────────────────────────────────────────────────────
 function Paywall({ onUnlock }) {
-  const [checking, setChecking] = useState(false);
+  const [step, setStep] = useState('pay'); // 'pay' | 'code'
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
 
-  function handlePaid() {
-    setChecking(true);
-    // honour-based: give them a moment then unlock
-    setTimeout(() => { onUnlock(); setChecking(false); }, 1800);
+  async function handlePaid() {
+    if (!email || !email.includes('@')) { setError('Please enter the email you used for PayPal.'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await fetch('/api/request-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setCodeSent(true);
+      setStep('code');
+    } catch (e) {
+      setError(e.message || 'Failed to send code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerify() {
+    if (!code || code.length !== 6) { setError('Please enter your 6-digit code.'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await fetch('/api/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      onUnlock();
+    } catch (e) {
+      setError(e.message || 'Invalid code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -880,22 +918,72 @@ function Paywall({ onUnlock }) {
         <li>Scene, structure, and character advice</li>
         <li>Covers from idea through query letter</li>
       </ul>
-      <div className="unlock-row">
-        <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank"
-          onSubmit={() => setTimeout(handlePaid, 2000)}>
-          <input type="hidden" name="cmd" value="_s-xclick" />
-          <input type="hidden" name="hosted_button_id" value="5343AJGX52X52" />
-          <button type="submit" className="btn btn-primary" style={{ width:'auto', minWidth:200 }}>
-            Pay $12 via PayPal
+
+      {step === 'pay' && (
+        <>
+          <div className="unlock-row" style={{ flexDirection:'column', gap:16, alignItems:'center' }}>
+            <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
+              <input type="hidden" name="cmd" value="_s-xclick" />
+              <input type="hidden" name="hosted_button_id" value="5343AJGX52X52" />
+              <button type="submit" className="btn btn-primary" style={{ width:'auto', minWidth:220 }}>
+                Pay $12 via PayPal
+              </button>
+            </form>
+            <div style={{ width:'100%', maxWidth:320 }}>
+              <div style={{ fontSize:13, color:'var(--muted)', marginBottom:8, textAlign:'left' }}>
+                After paying, enter your PayPal email to receive your unlock code:
+              </div>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                style={{
+                  width:'100%', padding:'11px 14px', border:'1px solid #ccc',
+                  borderRadius:4, fontSize:15, fontFamily:'inherit',
+                  marginBottom:10, outline:'none'
+                }}
+              />
+              <button className="btn btn-primary" onClick={handlePaid} disabled={loading || !email}
+                style={{ width:'100%' }}>
+                {loading ? <><span className="spinner" /> Sending code…</> : 'Send My Unlock Code'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {step === 'code' && (
+        <div style={{ width:'100%', maxWidth:320, margin:'0 auto' }}>
+          <div style={{ fontSize:13, color:'var(--muted)', marginBottom:12, textAlign:'center' }}>
+            A 6-digit code was sent to <strong>{email}</strong>.<br />Check your inbox and enter it below.
+          </div>
+          <input
+            type="text"
+            placeholder="Enter 6-digit code"
+            value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            style={{
+              width:'100%', padding:'11px 14px', border:'1px solid #ccc',
+              borderRadius:4, fontSize:22, fontFamily:'monospace', letterSpacing:'0.2em',
+              marginBottom:10, outline:'none', textAlign:'center'
+            }}
+          />
+          <button className="btn btn-primary" onClick={handleVerify} disabled={loading || code.length !== 6}
+            style={{ width:'100%' }}>
+            {loading ? <><span className="spinner" /> Verifying…</> : 'Unlock Writing Coach'}
           </button>
-        </form>
-        {checking
-          ? <span style={{ color:'var(--amber)', fontSize:14 }}><span className="spinner" style={{ marginRight:8 }} />Verifying…</span>
-          : <button className="btn btn-outline" onClick={handlePaid} style={{ fontSize:13 }}>I've already paid</button>
-        }
-      </div>
+          <button onClick={() => setStep('pay')}
+            style={{ background:'none', border:'none', color:'var(--muted)', fontSize:12,
+              cursor:'pointer', marginTop:10, width:'100%' }}>
+            ← Use a different email
+          </button>
+        </div>
+      )}
+
+      {error && <div className="error-box" style={{ marginTop:16 }}>{error}</div>}
       <p style={{ marginTop:16, fontSize:12, color:'var(--muted)' }}>
-        After payment, click "I've already paid" to continue immediately.
+        Questions? <a href="mailto:support@tinhousepress.com" style={{ color:'var(--amber)' }}>support@tinhousepress.com</a>
       </p>
     </div>
   );
