@@ -1,36 +1,72 @@
 const http = require('http');
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = 'claude-sonnet-4-6';
 
-function callClaude(messages, systemPrompt, maxTokens) {
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function readBody(req) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages,
+    let data = '';
+    req.on('data', chunk => (data += chunk));
+    req.on('end', () => {
+      try { resolve(JSON.parse(data)); }
+      catch (e) { reject(new Error('Invalid JSON')); }
     });
+    req.on('error', reject);
+  });
+}
 
-    const req = https.request({
+function sendJSON(res, status, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
+function sendFile(res, filePath, contentType) {
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
+}
+
+async function callClaude(messages, systemPrompt, maxTokens) {
+  const body = JSON.stringify({
+    model: 'claude-sonnet-4-6',
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages,
+  });
+
+  return new Promise((resolve, reject) => {
+    const options = {
       hostname: 'api.anthropic.com',
       path: '/v1/messages',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body),
         'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
       },
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
+    };
+
+    const req = require('https').request(options, res => {
+      let raw = '';
+      res.on('data', c => (raw += c));
       res.on('end', () => {
         try {
-          const parsed = JSON.parse(data);
+          const parsed = JSON.parse(raw);
           if (parsed.error) return reject(new Error(parsed.error.message));
           resolve(parsed.content[0].text);
         } catch (e) {
@@ -45,123 +81,91 @@ function callClaude(messages, systemPrompt, maxTokens) {
   });
 }
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try { resolve(JSON.parse(body)); }
-      catch (e) { reject(new Error('Invalid JSON')); }
-    });
-    req.on('error', reject);
-  });
+// ── route handlers ────────────────────────────────────────────────────────────
+
+async function handleDiagnose(req, res) {
+  const { genre, stage, premise, protagonist, conflict, stakes, theme } = await readBody(req);
+
+  const system = `You are a senior story analyst and developmental editor with 20+ years of experience evaluating manuscripts for major publishers. You give honest, precise, actionable diagnoses — not flattery. You understand commercial viability, genre conventions, and literary craft equally well.
+
+Respond ONLY with a valid JSON object. No markdown, no code fences, no preamble. The JSON must match this exact shape:
+
+{
+  "score": <integer 1–100>,
+  "verdict": "<one punchy sentence — the single most important truth about this story right now>",
+  "whatsWorking": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "critical": [
+    { "issue": "<problem title>", "detail": "<explanation>", "fix": "<concrete fix>" },
+    { "issue": "<problem title>", "detail": "<explanation>", "fix": "<concrete fix>" },
+    { "issue": "<problem title>", "detail": "<explanation>", "fix": "<concrete fix>" }
+  ],
+  "greenLight": "<2–3 sentences: should they write this book? Why or why not?>",
+  "comparables": ["<Title by Author (year)>", "<Title by Author (year)>", "<Title by Author (year)>"],
+  "nextSteps": ["<action 1>", "<action 2>", "<action 3>"]
 }
 
-function json(res, status, data) {
-  const body = JSON.stringify(data);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-  });
-  res.end(body);
+Score guide: 80–100 = strong commercial/literary potential, move forward confidently; 60–79 = solid foundation, specific work needed; 40–59 = interesting premise but structural problems; below 40 = significant rethinking required.`;
+
+  const userMsg = `Please diagnose this story:
+
+Genre: ${genre}
+Writing Stage: ${stage}
+Premise: ${premise}
+Protagonist: ${protagonist}
+Central Conflict: ${conflict}
+Stakes: ${stakes}
+Theme: ${theme}`;
+
+  try {
+    const text = await callClaude([{ role: 'user', content: userMsg }], system, 1800);
+    // Strip any accidental markdown fences
+    const clean = text.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(clean);
+    sendJSON(res, 200, data);
+  } catch (e) {
+    console.error('Diagnose error:', e.message);
+    sendJSON(res, 500, { error: e.message });
+  }
 }
+
+async function handleCoach(req, res) {
+  const { messages, storyContext } = await readBody(req);
+
+  const system = `You are a sharp, encouraging writing coach who has read the writer's story diagnosis. You know their genre, premise, protagonist, conflict, stakes, and theme. You give specific, practical advice tailored to THEIR story — never generic writing tips.
+
+Story context:
+${JSON.stringify(storyContext, null, 2)}
+
+Be direct and warm. Use the writer's specific details in every answer. Keep responses focused — under 300 words unless a longer answer genuinely serves them. If they ask something unrelated to writing or their story, gently steer back.`;
+
+  try {
+    const text = await callClaude(messages, system, 1000);
+    sendJSON(res, 200, { reply: text });
+  } catch (e) {
+    console.error('Coach error:', e.message);
+    sendJSON(res, 500, { error: e.message });
+  }
+}
+
+// ── server ────────────────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
-    return res.end();
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  const url = req.url.split('?')[0];
+
+  if (req.method === 'POST' && url === '/api/diagnose') return handleDiagnose(req, res);
+  if (req.method === 'POST' && url === '/api/coach')    return handleCoach(req, res);
+
+  if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
+    return sendFile(res, path.join(__dirname, 'index.html'), 'text/html; charset=utf-8');
   }
 
-  // Serve index.html
-  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-    const filePath = path.join(__dirname, 'index.html');
-    fs.readFile(filePath, (err, content) => {
-      if (err) { res.writeHead(500); return res.end('Server error'); }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(content);
-    });
-    return;
-  }
-
-  // POST /api/diagnose
-  if (req.method === 'POST' && req.url === '/api/diagnose') {
-    try {
-      const { genre, stage, premise, protagonist, conflict, stakes, theme } = await readBody(req);
-
-      if (!genre || !stage || !premise || !protagonist || !conflict || !stakes || !theme) {
-        return json(res, 400, { error: 'All fields are required.' });
-      }
-
-      const systemPrompt = `You are an expert literary agent and developmental editor.
-Analyze the story concept provided and return ONLY a valid JSON object with this exact structure:
-{
-  "viability_score": <integer 1-100>,
-  "score_label": "<one punchy phrase describing the score>",
-  "verdict": "<2-3 sentence honest assessment of the concept's potential>",
-  "working": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "missing": [
-    {"issue": "<gap 1>", "fix": "<concrete fix 1>"},
-    {"issue": "<gap 2>", "fix": "<concrete fix 2>"},
-    {"issue": "<gap 3>", "fix": "<concrete fix 3>"}
-  ],
-  "green_light": "<exactly one of: Write It Now | Develop Further First | Major Rethink Needed>",
-  "comparable_titles": ["<title 1>", "<title 2>", "<title 3>"],
-  "next_steps": ["<step 1>", "<step 2>", "<step 3>"],
-  "upgrade_prompt": "<one sentence inviting them to write with a coach>"
-}
-Return ONLY the JSON, no markdown fences, no preamble.`;
-
-      const userMessage = `Genre: ${genre}\nWriting stage: ${stage}\nPremise: ${premise}\nProtagonist: ${protagonist}\nCentral conflict: ${conflict}\nStakes: ${stakes}\nTheme: ${theme}`;
-
-      const raw = await callClaude([{ role: 'user', content: userMessage }], systemPrompt, 1800);
-      const cleaned = raw.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(cleaned);
-      return json(res, 200, result);
-    } catch (e) {
-      return json(res, 500, { error: e.message });
-    }
-  }
-
-  // POST /api/coach
-  if (req.method === 'POST' && req.url === '/api/coach') {
-    try {
-      const { messages, storyData } = await readBody(req);
-
-      if (!messages || !storyData) {
-        return json(res, 400, { error: 'Missing messages or storyData.' });
-      }
-
-      const storyContext = `Story details:
-- Genre: ${storyData.genre}
-- Stage: ${storyData.stage}
-- Premise: ${storyData.premise}
-- Protagonist: ${storyData.protagonist}
-- Conflict: ${storyData.conflict}
-- Stakes: ${storyData.stakes}
-- Theme: ${storyData.theme}`;
-
-      const systemPrompt = `You are an expert writing coach helping a fiction author develop their story.
-Always use the specific story details provided — never be generic.
-${storyContext}
-Write with the sensibility of a literary editor: precise, encouraging, craft-focused.`;
-
-      const reply = await callClaude(messages, systemPrompt, 1000);
-      return json(res, 200, { reply });
-    } catch (e) {
-      return json(res, 500, { error: e.message });
-    }
-  }
-
-  // 404
-  res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('Not found');
+  res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, () => {
-  console.log(`Story Diagnosis server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Story Diagnosis Tool running on port ${PORT}`));
