@@ -10,7 +10,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'support@tinhousepress.com';
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n').replace(/^["']|["']$/g, '');
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +67,12 @@ function base64url(buf) {
 }
 
 async function getGoogleAccessToken() {
+  if (!GOOGLE_PRIVATE_KEY || !GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+    throw new Error(`Missing credentials. Key length: ${GOOGLE_PRIVATE_KEY.length}, Email: ${GOOGLE_SERVICE_ACCOUNT_EMAIL || 'MISSING'}`);
+  }
+  if (!GOOGLE_PRIVATE_KEY.includes('BEGIN')) {
+    throw new Error(`Key malformed. First 80 chars: ${GOOGLE_PRIVATE_KEY.substring(0, 80)}`);
+  }
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
   const claim = base64url(Buffer.from(JSON.stringify({
