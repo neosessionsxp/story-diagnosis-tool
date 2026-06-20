@@ -43,12 +43,16 @@ function sendFile(res, filePath, contentType) {
   });
 }
 
-function httpsPost(hostname, path, headers, body) {
+function httpsPost(hostname, path, headers, body, contentType) {
   return new Promise((resolve, reject) => {
     const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
     const req = https.request({
       hostname, path, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr), ...headers },
+      headers: {
+        'Content-Type': contentType || 'application/json',
+        'Content-Length': Buffer.byteLength(bodyStr),
+        ...headers
+      },
     }, res => {
       let raw = '';
       res.on('data', c => (raw += c));
@@ -89,7 +93,8 @@ async function getGoogleAccessToken() {
   const jwt = `${toSign}.${sig}`;
 
   const res = await httpsPost('oauth2.googleapis.com', '/token', {},
-    `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+    `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+    'application/x-www-form-urlencoded'
   );
   const data = JSON.parse(res.body);
   if (!data.access_token) {
