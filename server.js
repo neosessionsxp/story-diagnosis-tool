@@ -92,7 +92,10 @@ async function getGoogleAccessToken() {
     `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
   );
   const data = JSON.parse(res.body);
-  if (!data.access_token) throw new Error('Failed to get Google access token');
+  if (!data.access_token) {
+    console.error('Google token response:', res.body);
+    throw new Error('Failed to get Google access token: ' + (data.error_description || data.error || res.body.substring(0, 200)));
+  }
   return data.access_token;
 }
 
