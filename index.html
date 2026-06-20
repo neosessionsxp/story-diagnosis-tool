@@ -1,1028 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Story Diagnosis Tool — Tin House Press</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pahina — NEOSESSIONS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
-    --bg:        #0f1117;
-    --surface:   #181c26;
-    --border:    #252a38;
-    --amber:     #e8a838;
-    --amber-dim: #8a6220;
-    --cream:     #f0e8d8;
-    --muted:     #7a8099;
-    --text:      #d4cfc7;
-    --green:     #4caf82;
-    --red:       #e05c5c;
-    --radius:    8px;
-  }
+    :root {
+      --ink:       #1a1714;
+      --sepia:     #c9b89a;
+      --parchment: #f2ead8;
+      --rust:      #b84b2f;
+      --gold:      #d4a017;
+      --dim:       #6b6254;
+    }
 
-  html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-weight: 300;
-    line-height: 1.7;
-    min-height: 100vh;
-  }
+    body {
+      background: var(--ink);
+      color: var(--parchment);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-  /* ── HEADER ── */
-  header {
-    border-bottom: 1px solid var(--border);
-    padding: 18px 32px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-  .logo-mark {
-    width: 36px; height: 36px;
-    border: 2px solid var(--amber);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Playfair Display', serif;
-    font-size: 16px;
-    color: var(--amber);
-    flex-shrink: 0;
-  }
-  .logo-text {
-    font-family: 'Playfair Display', serif;
-    font-size: 15px;
-    color: var(--cream);
-    letter-spacing: 0.04em;
-  }
-  .logo-text span { color: var(--amber); }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
 
-  /* ── HERO ── */
-  .hero {
-    text-align: center;
-    padding: 72px 24px 56px;
-    max-width: 700px;
-    margin: 0 auto;
-  }
-  .eyebrow {
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--amber);
-    margin-bottom: 20px;
-  }
-  .hero h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(36px, 6vw, 58px);
-    font-weight: 700;
-    color: var(--cream);
-    line-height: 1.15;
-    margin-bottom: 20px;
-  }
-  .hero h1 em { font-style: italic; color: var(--amber); }
-  .hero p {
-    font-size: 17px;
-    color: var(--muted);
-    max-width: 520px;
-    margin: 0 auto;
-  }
+    /* HERO */
+    .hero {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 100vh;
+      align-items: center;
+    }
 
-  /* ── PHASE INDICATOR ── */
-  .phases {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    margin: 0 auto 48px;
-    max-width: 500px;
-    padding: 0 24px;
-  }
-  .phase-step {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .phase-step.active { color: var(--cream); }
-  .phase-step.done { color: var(--amber); }
-  .phase-dot {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px;
-    font-weight: 600;
-    flex-shrink: 0;
-    color: var(--muted);
-  }
-  .phase-step.active .phase-dot {
-    border-color: var(--amber);
-    background: var(--amber);
-    color: var(--bg);
-  }
-  .phase-step.done .phase-dot {
-    border-color: var(--amber);
-    color: var(--amber);
-    background: transparent;
-  }
-  .phase-line {
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-    margin: 0 12px;
-  }
+    .hero-art {
+      position: relative;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-  /* ── MAIN CONTAINER ── */
-  .container {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 0 24px 80px;
-  }
+    .hero-art img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: sepia(0.2) brightness(0.88);
+    }
 
-  /* ── FORM ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 40px;
-  }
+    .hero-art::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, transparent 55%, var(--ink) 100%);
+    }
 
-  .field { margin-bottom: 28px; }
-  .field label {
-    display: block;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--amber);
-    margin-bottom: 8px;
-    font-weight: 500;
-  }
-  .field .hint {
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 8px;
-    font-style: italic;
-  }
-  .field input, .field select, .field textarea {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--cream);
-    font-family: 'Inter', sans-serif;
-    font-size: 15px;
-    font-weight: 300;
-    padding: 12px 16px;
-    outline: none;
-    transition: border-color 0.2s;
-    resize: vertical;
-  }
-  .field input:focus, .field select:focus, .field textarea:focus {
-    border-color: var(--amber-dim);
-  }
-  .field select option { background: var(--surface); }
+    .hero-copy {
+      padding: 4rem 4rem 4rem 3rem;
+      position: relative;
+      z-index: 1;
+    }
 
-  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.4rem;
+    }
 
-  /* ── BUTTONS ── */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 28px;
-    border-radius: var(--radius);
-    font-family: 'Inter', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    transition: opacity 0.2s, transform 0.1s;
-    text-decoration: none;
-  }
-  .btn:active { transform: scale(0.98); }
-  .btn-primary {
-    background: var(--amber);
-    color: var(--bg);
-    width: 100%;
-  }
-  .btn-primary:hover { opacity: 0.9; }
-  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-  .btn-outline {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text);
-  }
-  .btn-outline:hover { border-color: var(--amber-dim); color: var(--cream); }
+    .album-title {
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+      font-size: clamp(3.5rem, 6vw, 6rem);
+      line-height: 0.92;
+      color: var(--parchment);
+      margin-bottom: 0.5rem;
+    }
 
-  /* ── DIAGNOSIS RESULTS ── */
-  .score-ring-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 36px;
-  }
-  .score-ring {
-    position: relative;
-    width: 140px; height: 140px;
-    margin-bottom: 16px;
-  }
-  .score-ring svg { transform: rotate(-90deg); }
-  .score-ring .score-num {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  .score-num .num {
-    font-family: 'Playfair Display', serif;
-    font-size: 42px;
-    font-weight: 700;
-    color: var(--cream);
-    line-height: 1;
-  }
-  .score-num .label {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-  .verdict {
-    font-family: 'Playfair Display', serif;
-    font-size: 20px;
-    font-style: italic;
-    color: var(--cream);
-    text-align: center;
-    max-width: 560px;
-    line-height: 1.4;
-  }
+    .artist-name {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      color: var(--sepia);
+      text-transform: uppercase;
+      margin-bottom: 2.4rem;
+    }
 
-  .section-heading {
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--amber);
-    font-weight: 500;
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
+    .description {
+      font-size: 0.95rem;
+      line-height: 1.75;
+      color: var(--sepia);
+      max-width: 34ch;
+      margin-bottom: 2rem;
+    }
 
-  .result-section { margin-bottom: 32px; }
+    .description em { font-style: italic; color: var(--parchment); }
 
-  .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tag {
-    background: rgba(232,168,56,0.1);
-    border: 1px solid var(--amber-dim);
-    color: var(--amber);
-    border-radius: 4px;
-    padding: 4px 12px;
-    font-size: 13px;
-  }
-  .tag.green {
-    background: rgba(76,175,130,0.1);
-    border-color: #2d7a56;
-    color: var(--green);
-  }
+    .release-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.16em;
+      color: var(--dim);
+      text-transform: uppercase;
+      margin-top: 2rem;
+    }
 
-  .issue-card {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--red);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    margin-bottom: 12px;
-  }
-  .issue-card .issue-title {
-    font-weight: 500;
-    color: var(--cream);
-    margin-bottom: 6px;
-    font-size: 14px;
-  }
-  .issue-card .issue-detail {
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 10px;
-  }
-  .issue-card .fix {
-    font-size: 13px;
-    color: var(--green);
-    display: flex;
-    gap: 8px;
-  }
-  .issue-card .fix::before { content: '→'; flex-shrink: 0; }
+    .release-tag span { color: var(--gold); }
 
-  .green-light-box {
-    background: rgba(76,175,130,0.08);
-    border: 1px solid #2d7a56;
-    border-radius: var(--radius);
-    padding: 20px;
-    font-size: 15px;
-    color: var(--text);
-    line-height: 1.6;
-  }
+    /* DIVIDER */
+    .section-divider {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(201,184,154,0.2) 30%, rgba(201,184,154,0.2) 70%, transparent);
+    }
 
-  .steps-list { list-style: none; counter-reset: steps; }
-  .steps-list li {
-    counter-increment: steps;
-    display: flex;
-    gap: 14px;
-    margin-bottom: 12px;
-    font-size: 14px;
-    color: var(--text);
-  }
-  .steps-list li::before {
-    content: counter(steps);
-    background: var(--amber);
-    color: var(--bg);
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px;
-    font-weight: 700;
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
+    /* TRACKLIST */
+    .tracklist-section {
+      position: relative;
+      z-index: 1;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 5rem 2rem 6rem;
+    }
 
-  /* ── PAYWALL ── */
-  .paywall {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 40px;
-    text-align: center;
-    margin-top: 32px;
-  }
-  .paywall h3 {
-    font-family: 'Playfair Display', serif;
-    font-size: 24px;
-    color: var(--cream);
-    margin-bottom: 12px;
-  }
-  .paywall p { color: var(--muted); margin-bottom: 24px; font-size: 15px; }
-  .price-badge {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
-    background: rgba(232,168,56,0.12);
-    border: 1px solid var(--amber-dim);
-    border-radius: 6px;
-    padding: 8px 18px;
-    margin-bottom: 24px;
-  }
-  .price-badge .dollar { font-size: 24px; color: var(--amber); font-weight: 700; }
-  .price-badge .cents { font-size: 14px; color: var(--amber-dim); }
-  .paywall-features {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 28px;
-    text-align: left;
-    max-width: 320px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .paywall-features li {
-    display: flex;
-    gap: 10px;
-    font-size: 14px;
-    color: var(--text);
-  }
-  .paywall-features li::before { content: '✓'; color: var(--green); font-weight: 700; }
+    .section-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 2.5rem;
+    }
 
-  .unlock-row { display: flex; align-items: center; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    #tracklist { list-style: none; }
 
-  /* ── COACH CHAT ── */
-  .coach-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    margin-top: 32px;
-  }
-  .coach-header {
-    padding: 20px 28px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .coach-header .coach-icon {
-    width: 38px; height: 38px;
-    background: rgba(232,168,56,0.15);
-    border: 1px solid var(--amber-dim);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
-  .coach-header .coach-name {
-    font-family: 'Playfair Display', serif;
-    font-size: 17px;
-    color: var(--cream);
-  }
-  .coach-header .coach-sub { font-size: 12px; color: var(--muted); }
+    .track {
+      background: rgba(255,255,255,0.04);
+      margin-bottom: 2px;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.18s;
+    }
 
-  .chat-messages {
-    padding: 24px 28px;
-    min-height: 260px;
-    max-height: 480px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-  .chat-msg { display: flex; gap: 12px; }
-  .chat-msg.user { flex-direction: row-reverse; }
-  .msg-bubble {
-    max-width: 78%;
-    padding: 12px 16px;
-    border-radius: 12px;
-    font-size: 14px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-  }
-  .chat-msg.user .msg-bubble {
-    background: rgba(232,168,56,0.15);
-    border: 1px solid var(--amber-dim);
-    color: var(--cream);
-    border-bottom-right-radius: 4px;
-  }
-  .chat-msg.assistant .msg-bubble {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-bottom-left-radius: 4px;
-  }
-  .msg-avatar {
-    width: 30px; height: 30px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px;
-    margin-top: 2px;
-  }
-  .chat-msg.user .msg-avatar { background: var(--amber); color: var(--bg); }
-  .chat-msg.assistant .msg-avatar { background: var(--border); color: var(--muted); }
+    .track:hover { background: rgba(255,255,255,0.08); }
 
-  .quick-prompts {
-    padding: 0 28px 20px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .quick-btn {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    color: var(--text);
-    font-size: 13px;
-    padding: 6px 14px;
-    cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
-    font-family: 'Inter', sans-serif;
-  }
-  .quick-btn:hover { border-color: var(--amber-dim); color: var(--cream); }
+    .track::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--rust);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.18s;
+    }
 
-  .chat-input-row {
-    padding: 16px 28px 24px;
-    display: flex;
-    gap: 10px;
-    border-top: 1px solid var(--border);
-  }
-  .chat-input-row input {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--cream);
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    font-weight: 300;
-    padding: 11px 16px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .chat-input-row input:focus { border-color: var(--amber-dim); }
-  .btn-send {
-    background: var(--amber);
-    border: none;
-    border-radius: var(--radius);
-    color: var(--bg);
-    width: 42px; height: 42px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-    flex-shrink: 0;
-    transition: opacity 0.2s;
-  }
-  .btn-send:hover { opacity: 0.85; }
-  .btn-send:disabled { opacity: 0.35; cursor: not-allowed; }
+    .track:hover::before { transform: scaleX(1); }
 
-  /* ── FREE TAG ── */
-  .free-tag {
-    background: rgba(76,175,130,0.15);
-    border: 1px solid #2d7a56;
-    border-radius: 4px;
-    color: var(--green);
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    padding: 2px 8px;
-    font-weight: 500;
-  }
+    .track-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.9rem 1.2rem;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
 
-  /* ── LOADING ── */
-  .spinner {
-    display: inline-block;
-    width: 18px; height: 18px;
-    border: 2px solid rgba(232,168,56,0.3);
-    border-top-color: var(--amber);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+    .track-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--dim);
+      width: 1.8rem;
+      text-align: right;
+      flex-shrink: 0;
+    }
 
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    padding: 60px 0;
-    color: var(--muted);
-    font-size: 15px;
-  }
-  .loading-state .big-spinner {
-    width: 40px; height: 40px;
-    border-width: 3px;
-  }
+    .track-info { flex: 1; min-width: 0; }
 
-  /* ── ERROR ── */
-  .error-box {
-    background: rgba(224,92,92,0.1);
-    border: 1px solid #6b2e2e;
-    border-radius: var(--radius);
-    padding: 14px 18px;
-    color: #e05c5c;
-    font-size: 14px;
-    margin-top: 16px;
-  }
+    .track-name {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 400;
+      color: var(--parchment);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
-  /* ── DIVIDER ── */
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 32px 0;
-  }
+    .track-feat {
+      font-size: 0.75rem;
+      color: var(--dim);
+      margin-top: 0.1rem;
+    }
 
-  /* ── FOOTER ── */
-  footer {
-    text-align: center;
-    padding: 32px 24px;
-    border-top: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--muted);
-  }
-  footer a { color: var(--amber); text-decoration: none; }
-</style>
+    .track-duration {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    /* Native audio player — styled to match the theme */
+    .track-player {
+      display: none;
+      padding: 0 1.2rem 0.9rem 1.2rem;
+    }
+
+    .track-player.open { display: block; }
+
+    .track-player audio {
+      width: 100%;
+      height: 36px;
+      outline: none;
+      filter: invert(1) sepia(1) saturate(0.5) hue-rotate(0deg) brightness(0.75);
+    }
+
+    /* FOOTER */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid rgba(201,184,154,0.1);
+      padding: 2rem;
+    }
+
+    .footer-inner {
+      max-width: 820px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-brand {
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--sepia);
+    }
+
+    .footer-copy {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .hero-art { height: 55vw; max-height: 320px; }
+      .hero-art::after { background: linear-gradient(to bottom, transparent 55%, var(--ink) 100%); }
+      .hero-copy { padding: 2.5rem 1.5rem 3rem; }
+      .album-title { font-size: clamp(3rem, 12vw, 4.5rem); }
+      .tracklist-section { padding: 3rem 1.2rem 4rem; }
+      .footer-inner { flex-direction: column; text-align: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
 </head>
 <body>
 
-<div id="root"></div>
-
-<script type="text/babel">
-const { useState, useRef, useEffect, useCallback } = React;
-
-// ── Score Ring ──────────────────────────────────────────────────────────────
-function ScoreRing({ score }) {
-  const r = 58, cx = 70, cy = 70;
-  const circ = 2 * Math.PI * r;
-  const fill = circ - (circ * score / 100);
-  const color = score >= 80 ? '#4caf82' : score >= 60 ? '#e8a838' : score >= 40 ? '#e08838' : '#e05c5c';
-  return (
-    <div className="score-ring-wrap">
-      <div className="score-ring">
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#252a38" strokeWidth="8" />
-          <circle
-            cx={cx} cy={cy} r={r} fill="none"
-            stroke={color} strokeWidth="8"
-            strokeDasharray={circ}
-            strokeDashoffset={fill}
-            strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 1s ease' }}
-          />
-        </svg>
-        <div className="score-num">
-          <span className="num" style={{ color }}>{score}</span>
-          <span className="label">Viability</span>
-        </div>
-      </div>
+  <section class="hero">
+    <div class="hero-art">
+      <img src="https://hearnow.com/dynamic/images/sralb04509883/large.jpg" alt="Pahina album cover" />
     </div>
-  );
-}
-
-// ── Phase Indicator ─────────────────────────────────────────────────────────
-function PhaseBar({ phase }) {
-  // phase: 'form' | 'results' | 'coach'
-  const steps = [
-    { id: 'form', label: 'Story Details' },
-    { id: 'results', label: 'Diagnosis' },
-    { id: 'coach', label: 'Writing Coach' },
-  ];
-  const idx = steps.findIndex(s => s.id === phase);
-  return (
-    <div className="phases">
-      {steps.map((s, i) => (
-        <React.Fragment key={s.id}>
-          {i > 0 && <div className="phase-line" />}
-          <div className={`phase-step ${i < idx ? 'done' : i === idx ? 'active' : ''}`}>
-            <div className="phase-dot">{i < idx ? '✓' : i + 1}</div>
-            <span>{s.label}</span>
-          </div>
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-// ── Diagnosis Form ──────────────────────────────────────────────────────────
-function DiagnosisForm({ onResult }) {
-  const [form, setForm] = useState({
-    genre: '', stage: '', premise: '', protagonist: '', conflict: '', stakes: '', theme: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const canSubmit = form.genre && form.stage && form.premise.length > 20
-    && form.protagonist.length > 10 && form.conflict.length > 10 && form.stakes.length > 10;
-
-  async function submit() {
-    setLoading(true); setError('');
-    try {
-      const res = await fetch('/api/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      onResult(data, form);
-    } catch (e) {
-      setError(e.message || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="card">
-      <div className="field-row">
-        <div className="field">
-          <label>Genre</label>
-          <select value={form.genre} onChange={e => set('genre', e.target.value)}>
-            <option value="">Select genre…</option>
-            {['Literary Fiction','Commercial Fiction','Mystery / Thriller','Romance','Science Fiction',
-              'Fantasy','Historical Fiction','Horror','Young Adult','Middle Grade',
-              'Memoir','Narrative Non-fiction','Self-Help','Other'].map(g => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Writing Stage</label>
-          <select value={form.stage} onChange={e => set('stage', e.target.value)}>
-            <option value="">Select stage…</option>
-            {['Idea / Concept','Outline / Planning','First Draft (early)','First Draft (complete)',
-              'Revising','Polished Draft','Ready to Query'].map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="field">
-        <label>Premise</label>
-        <div className="hint">One paragraph: what happens + why it matters</div>
-        <textarea rows={4} placeholder="When [inciting incident], [protagonist] must [goal], or else [consequence]…"
-          value={form.premise} onChange={e => set('premise', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label>Protagonist</label>
-        <div className="hint">Who they are + what they want externally + what they need internally</div>
-        <textarea rows={3} placeholder="A 35-year-old forensic accountant who wants to expose corporate fraud but needs to learn…"
-          value={form.protagonist} onChange={e => set('protagonist', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label>Central Conflict</label>
-        <div className="hint">The main force opposing your protagonist's goal</div>
-        <textarea rows={3} placeholder="The antagonist/force, what they want, and why they're in direct opposition…"
-          value={form.conflict} onChange={e => set('conflict', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label>Stakes</label>
-        <div className="hint">What does your protagonist stand to lose? Internal + external</div>
-        <textarea rows={2} placeholder="If she fails, the corporation destroys her career — and she never learns to trust again…"
-          value={form.stakes} onChange={e => set('stakes', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label>Theme</label>
-        <div className="hint">What is your story ultimately about — the human truth underneath the plot?</div>
-        <textarea rows={2} placeholder="This is a story about the cost of silence, and what it means to finally speak…"
-          value={form.theme} onChange={e => set('theme', e.target.value)} />
-      </div>
-
-      {error && <div className="error-box">{error}</div>}
-
-      <button className="btn btn-primary" onClick={submit} disabled={loading || !canSubmit}>
-        {loading ? <><span className="spinner" /> Diagnosing your story…</> : 'Run Story Diagnosis'}
-      </button>
-
-      {loading && (
-        <div style={{ textAlign:'center', marginTop:20, fontSize:13, color:'var(--muted)' }}>
-          Analysing premise strength, conflict architecture, and market viability…
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Results ─────────────────────────────────────────────────────────────────
-function DiagnosisResults({ data, form, onCoach }) {
-  return (
-    <div className="card">
-      <ScoreRing score={data.score} />
-      <p className="verdict">"{data.verdict}"</p>
-      <hr className="divider" />
-
-      <div className="result-section">
-        <div className="section-heading">What's Working</div>
-        <div className="tag-list">
-          {data.whatsWorking.map((w, i) => <span key={i} className="tag green">{w}</span>)}
-        </div>
-      </div>
-
-      <div className="result-section">
-        <div className="section-heading">Critical Issues & Fixes</div>
-        {data.critical.map((c, i) => (
-          <div key={i} className="issue-card">
-            <div className="issue-title">{c.issue}</div>
-            <div className="issue-detail">{c.detail}</div>
-            <div className="fix">{c.fix}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="result-section">
-        <div className="section-heading">Green-Light Assessment</div>
-        <div className="green-light-box">{data.greenLight}</div>
-      </div>
-
-      <div className="result-section">
-        <div className="section-heading">Comparable Titles</div>
-        <div className="tag-list">
-          {data.comparables.map((c, i) => <span key={i} className="tag">{c}</span>)}
-        </div>
-      </div>
-
-      <div className="result-section">
-        <div className="section-heading">Next Steps</div>
-        <ol className="steps-list">
-          {data.nextSteps.map((s, i) => <li key={i}>{s}</li>)}
-        </ol>
-      </div>
-
-      <hr className="divider" />
-      <button className="btn btn-primary" onClick={onCoach}>
-        Continue to Writing Coach →
-      </button>
-    </div>
-  );
-}
-
-// ── Paywall ─────────────────────────────────────────────────────────────────
-function Paywall({ onUnlock }) {
-  const [checking, setChecking] = useState(false);
-
-  function handlePaid() {
-    setChecking(true);
-    // honour-based: give them a moment then unlock
-    setTimeout(() => { onUnlock(); setChecking(false); }, 1800);
-  }
-
-  return (
-    <div className="paywall">
-      <h3>Unlock Your Writing Coach</h3>
-      <p>You've used your free coaching response.<br />Get unlimited coaching on this story for a one-time fee.</p>
-      <div className="price-badge">
-        <span className="dollar">$9</span>
-        <span className="cents">USD · one-time</span>
-      </div>
-      <ul className="paywall-features">
-        <li>Unlimited coaching session for this story</li>
-        <li>Answers tailored to your specific premise</li>
-        <li>Scene, structure, and character advice</li>
-        <li>Covers from idea through query letter</li>
-      </ul>
-      <div className="unlock-row">
-        <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank"
-          onSubmit={() => setTimeout(handlePaid, 2000)}>
-          <input type="hidden" name="cmd" value="_s-xclick" />
-          <input type="hidden" name="hosted_button_id" value="5343AJGX52X52" />
-          <button type="submit" className="btn btn-primary" style={{ width:'auto', minWidth:200 }}>
-            Pay $9 via PayPal
-          </button>
-        </form>
-        {checking
-          ? <span style={{ color:'var(--amber)', fontSize:14 }}><span className="spinner" style={{ marginRight:8 }} />Verifying…</span>
-          : <button className="btn btn-outline" onClick={handlePaid} style={{ fontSize:13 }}>I've already paid</button>
-        }
-      </div>
-      <p style={{ marginTop:16, fontSize:12, color:'var(--muted)' }}>
-        After payment, click "I've already paid" to continue immediately.
+    <div class="hero-copy">
+      <p class="eyebrow">Debut Full-Length · 2026</p>
+      <h1 class="album-title">Pahina</h1>
+      <p class="artist-name">NEOSESSIONS</p>
+      <p class="description">
+        <em>"Pahina"</em> or page — and this album is nine of them.
+        NEOSESSIONS' debut full-length moves across love, loss, and the quiet search for self
+        in two languages without ever losing its thread. The carrier single Pahina opens the story;
+        collaborations with Yuki Padilla deepen it. Nine tracks, all written by Kevin Padilla.
+        One unfinished feeling. The session never ends.
       </p>
+      <p class="release-tag">Released <span>2026</span> · 9 Tracks · OPM Indietronica</p>
     </div>
-  );
-}
+  </section>
 
-// ── Coach Chat ───────────────────────────────────────────────────────────────
-const QUICK_PROMPTS = [
-  'How do I strengthen my protagonist\'s arc?',
-  'What scene should I write next?',
-  'How do I raise the stakes in act two?',
-  'Help me write a query letter hook',
-];
+  <div class="section-divider"></div>
 
-function CoachChat({ form, diagnosis }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [freeUsed, setFreeUsed] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [error, setError] = useState('');
-  const bottomRef = useRef(null);
+  <section class="tracklist-section">
+    <p class="section-label">Album Tracks</p>
+    <ol id="tracklist"></ol>
+  </section>
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">NEOSESSIONS</div>
+      <p class="footer-copy">© 2026 NEOSESSIONS · Kevin Padilla</p>
+    </div>
+  </footer>
 
-  async function sendMessage(text) {
-    if (!text.trim() || loading) return;
-    if (freeUsed && !unlocked) { setShowPaywall(true); return; }
+  <script>
+    var BASE = 'https://audio.styluspress.com/';
+    var tracks = [
+      { num:'01', name:'Ikaw Na Nga Kaya',  feat:'Remix',              dur:'5:26', file:'Ikaw%20Na%20Nga%20Kaya%20-%20Remix.mp3' },
+      { num:'02', name:'Mahal Pa Rin Kita', feat:'',                   dur:'4:02', file:'Mahal%20Pa%20Rin%20Kita.mp3' },
+      { num:'03', name:'Ikaw Ang Adlaw Ko', feat:'feat. Yuki Padilla', dur:'4:17', file:'Ikaw%20Ang%20Adlaw%20Ko.mp3' },
+      { num:'04', name:'Pahina',            feat:'Carrier Single',     dur:'4:45', file:'PAHINA.mp3' },
+      { num:'05', name:'Hanggang Ngayon',   feat:'Alternate Mix',      dur:'4:33', file:'Hanggang%20Ngayon%20.mp3' },
+      { num:'06', name:'Pinagtagpo',        feat:'feat. Yuki Padilla', dur:'3:58', file:'Pinagtagpo%20(alt%20Mix).mp3' },
+      { num:'07', name:'Paalam, Mahal',     feat:'',                   dur:'4:43', file:'Paalam%20Mahal.mp3' },
+      { num:'08', name:'Hanggang Sa Muli',  feat:'feat. Yuki Padilla', dur:'3:47', file:'Hanggang%20Sa%20Muli.mp3' },
+      { num:'09', name:'Pahina',            feat:'Acoustic Version',   dur:'5:04', file:'Pahina-%20Acoustic.mp3' },
+    ];
 
-    const userMsg = { role: 'user', content: text.trim() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInput('');
-    setLoading(true); setError('');
+    var list = document.getElementById('tracklist');
+    var currentPlayer = null;
 
-    try {
-      const res = await fetch('/api/coach', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, storyContext: form }),
+    tracks.forEach(function(t, i) {
+      var li = document.createElement('li');
+      li.className = 'track';
+
+      // Header row
+      var header = document.createElement('div');
+      header.className = 'track-header';
+
+      var num = document.createElement('span');
+      num.className = 'track-num';
+      num.textContent = t.num;
+
+      var info = document.createElement('div');
+      info.className = 'track-info';
+
+      var name = document.createElement('div');
+      name.className = 'track-name';
+      name.textContent = t.name;
+      info.appendChild(name);
+
+      if (t.feat) {
+        var feat = document.createElement('div');
+        feat.className = 'track-feat';
+        feat.textContent = t.feat;
+        info.appendChild(feat);
+      }
+
+      var dur = document.createElement('span');
+      dur.className = 'track-duration';
+      dur.textContent = t.dur;
+
+      header.appendChild(num);
+      header.appendChild(info);
+      header.appendChild(dur);
+
+      // Native audio player
+      var playerWrap = document.createElement('div');
+      playerWrap.className = 'track-player';
+
+      var audio = document.createElement('audio');
+      audio.controls = true;
+      audio.preload = 'none';
+      audio.src = BASE + t.file;
+      audio.setAttribute('controlslist', 'nodownload');
+      audio.setAttribute('oncontextmenu', 'return false');
+      playerWrap.appendChild(audio);
+
+      // Toggle player open/close on header tap
+      header.addEventListener('click', function() {
+        // Close any other open player
+        if (currentPlayer && currentPlayer !== playerWrap) {
+          currentPlayer.classList.remove('open');
+          currentPlayer.querySelector('audio').pause();
+        }
+        playerWrap.classList.toggle('open');
+        if (playerWrap.classList.contains('open')) {
+          currentPlayer = playerWrap;
+          audio.play();
+        } else {
+          audio.pause();
+        }
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setMessages(m => [...m, { role: 'assistant', content: data.reply }]);
-      if (!freeUsed) setFreeUsed(true);
-    } catch (e) {
-      setError(e.message || 'Could not reach the coach. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  return (
-    <>
-      <div className="coach-panel">
-        <div className="coach-header">
-          <div className="coach-icon">✍️</div>
-          <div>
-            <div className="coach-name">Writing Coach</div>
-            <div className="coach-sub">Tailored to your story · {freeUsed && !unlocked ? <span style={{color:'var(--amber)'}}>1 free response used</span> : <span className="free-tag">First response free</span>}</div>
-          </div>
-        </div>
+      li.appendChild(header);
+      li.appendChild(playerWrap);
+      list.appendChild(li);
+    });
+  </script>
 
-        <div className="chat-messages">
-          {messages.length === 0 && (
-            <div style={{ color:'var(--muted)', fontSize:14, fontStyle:'italic', margin:'auto', textAlign:'center', padding:'20px 0' }}>
-              Ask me anything about your story. I've read your diagnosis and know your specific premise, protagonist, and conflict.
-            </div>
-          )}
-          {messages.map((m, i) => (
-            <div key={i} className={`chat-msg ${m.role}`}>
-              <div className="msg-avatar">{m.role === 'user' ? 'U' : '✍'}</div>
-              <div className="msg-bubble">{m.content}</div>
-            </div>
-          ))}
-          {loading && (
-            <div className="chat-msg assistant">
-              <div className="msg-avatar">✍</div>
-              <div className="msg-bubble" style={{ color:'var(--muted)' }}>
-                <span className="spinner" style={{ width:14, height:14, borderWidth:2 }} />
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {messages.length === 0 && (
-          <div className="quick-prompts">
-            {QUICK_PROMPTS.map((q, i) => (
-              <button key={i} className="quick-btn" onClick={() => sendMessage(q)}>{q}</button>
-            ))}
-          </div>
-        )}
-
-        {error && <div className="error-box" style={{ margin:'0 28px 16px' }}>{error}</div>}
-
-        <div className="chat-input-row">
-          <input
-            placeholder="Ask about your story…"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-            disabled={loading}
-          />
-          <button className="btn-send" onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>→</button>
-        </div>
-      </div>
-
-      {showPaywall && <Paywall onUnlock={() => { setUnlocked(true); setShowPaywall(false); }} />}
-    </>
-  );
-}
-
-// ── App ──────────────────────────────────────────────────────────────────────
-function App() {
-  const [phase, setPhase] = useState('form'); // 'form' | 'results' | 'coach'
-  const [diagnosis, setDiagnosis] = useState(null);
-  const [form, setForm] = useState(null);
-
-  function handleResult(data, f) {
-    setDiagnosis(data); setForm(f);
-    setPhase('results');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function handleCoach() {
-    setPhase('coach');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  return (
-    <>
-      <header>
-        <div className="logo-mark">T</div>
-        <div className="logo-text">Tin House <span>Press</span></div>
-      </header>
-
-      <div className="hero">
-        <div className="eyebrow">AI Story Diagnosis</div>
-        <h1>Is your story <em>ready</em><br />to be written?</h1>
-        <p>Get a clinical viability score, identify structural weaknesses, and unlock a writing coach who knows your story — before you write a single chapter.</p>
-      </div>
-
-      <PhaseBar phase={phase} />
-
-      <div className="container">
-        {phase === 'form' && <DiagnosisForm onResult={handleResult} />}
-        {phase === 'results' && diagnosis && (
-          <DiagnosisResults data={diagnosis} form={form} onCoach={handleCoach} />
-        )}
-        {phase === 'coach' && form && (
-          <CoachChat form={form} diagnosis={diagnosis} />
-        )}
-      </div>
-
-      <footer>
-        © {new Date().getFullYear()} Tin House Press · <a href="https://tinhousepress.com">tinhousepress.com</a>
-        <br />Powered by Claude AI · Questions? <a href="mailto:hello@tinhousepress.com">hello@tinhousepress.com</a>
-      </footer>
-    </>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-</script>
 </body>
 </html>
