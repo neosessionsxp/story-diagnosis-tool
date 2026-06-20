@@ -913,10 +913,10 @@ function Paywall({ onUnlock }) {
         <span className="cents">USD · one-time</span>
       </div>
       <ul className="paywall-features">
-        <li>Unlimited coaching session for this story</li>
-        <li>Answers tailored to your specific premise</li>
-        <li>Scene, structure, and character advice</li>
-        <li>Covers from idea through query letter</li>
+        <li>20 coaching exchanges with a coach who knows your story</li>
+        <li>Scene, structure, character, and craft advice</li>
+        <li>Closing session summary with action plan & next milestone</li>
+        <li>Tailored to your specific premise and genre</li>
       </ul>
 
       {step === 'pay' && (
@@ -997,6 +997,9 @@ const QUICK_PROMPTS = [
   'Help me write a query letter hook',
 ];
 
+const MAX_EXCHANGES = 20;
+const WRAPUP_AT = 18; // Suggest wrap-up at 18, force at 20
+
 function CoachChat({ form, diagnosis }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -1005,14 +1008,20 @@ function CoachChat({ form, diagnosis }) {
   const [unlocked, setUnlocked] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [error, setError] = useState('');
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [closingSummary, setClosingSummary] = useState(null);
   const bottomRef = useRef(null);
+
+  // Count exchanges: one exchange = one user msg + one assistant msg
+  const exchangeCount = messages.filter(m => m.role === 'assistant').length;
+  const remaining = MAX_EXCHANGES - exchangeCount;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  }, [messages, loading, closingSummary]);
 
   async function sendMessage(text) {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || sessionEnded) return;
     if (freeUsed && !unlocked) { setShowPaywall(true); return; }
 
     const userMsg = { role: 'user', content: text.trim() };
@@ -1021,18 +1030,51 @@ function CoachChat({ form, diagnosis }) {
     setInput('');
     setLoading(true); setError('');
 
+    // Tell Claude to start wrapping up as we approach the limit
+    const isWrapup = exchangeCount + 1 >= WRAPUP_AT;
+    const exchangesLeft = MAX_EXCHANGES - (exchangeCount + 1);
+
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, storyContext: form }),
+        body: JSON.stringify({
+          messages: newMessages,
+          storyContext: form,
+          isWrapup,
+          exchangesLeft,
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setMessages(m => [...m, { role: 'assistant', content: data.reply }]);
       if (!freeUsed) setFreeUsed(true);
+
+      // If we just hit the cap, generate the closing summary
+      if (exchangeCount + 1 >= MAX_EXCHANGES) {
+        await generateClosing(newMessages.concat({ role: 'assistant', content: data.reply }));
+      }
     } catch (e) {
       setError(e.message || 'Could not reach the coach. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateClosing(allMessages) {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/closing-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: allMessages, storyContext: form }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setClosingSummary(data.summary);
+      setSessionEnded(true);
+    } catch (e) {
+      setError('Failed to generate closing summary.');
     } finally {
       setLoading(false);
     }
@@ -1043,9 +1085,18 @@ function CoachChat({ form, diagnosis }) {
       <div className="coach-panel">
         <div className="coach-header">
           <div className="coach-icon">✍️</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div className="coach-name">Writing Coach</div>
-            <div className="coach-sub">Tailored to your story · {freeUsed && !unlocked ? <span style={{color:'var(--amber)'}}>1 free response used</span> : <span className="free-tag">First response free</span>}</div>
+            <div className="coach-sub">
+              {!freeUsed && !unlocked && <span className="free-tag">First exchange free</span>}
+              {freeUsed && !unlocked && <span style={{color:'var(--amber)'}}>Free exchange used · unlock for {MAX_EXCHANGES} total</span>}
+              {unlocked && !sessionEnded && (
+                <span style={{ color: remaining <= 3 ? 'var(--amber)' : 'var(--muted)' }}>
+                  {remaining} {remaining === 1 ? 'exchange' : 'exchanges'} remaining
+                </span>
+              )}
+              {sessionEnded && <span style={{color:'var(--green)'}}>Session complete</span>}
+            </div>
           </div>
         </div>
 
@@ -1069,6 +1120,42 @@ function CoachChat({ form, diagnosis }) {
               </div>
             </div>
           )}
+
+          {closingSummary && (
+            <div style={{
+              background:'#fafafa', border:'1px solid var(--border)',
+              borderLeft:'3px solid var(--amber)', borderRadius:6,
+              padding:'24px', marginTop:24
+            }}>
+              <div style={{
+                fontFamily:'Chau Philomene One, sans-serif',
+                fontSize:14, letterSpacing:'0.14em', textTransform:'uppercase',
+                color:'var(--amber)', marginBottom:16, paddingBottom:8,
+                borderBottom:'2px solid var(--amber)'
+              }}>Session Summary & Next Steps</div>
+              {closingSummary.actionPlan && (
+                <div style={{ marginBottom:18 }}>
+                  <div style={{ fontWeight:600, marginBottom:6, color:'#1a1a1a' }}>Your Action Plan</div>
+                  <div style={{ fontSize:14, color:'var(--text)' }}>{closingSummary.actionPlan}</div>
+                </div>
+              )}
+              {closingSummary.topPriorities && (
+                <div style={{ marginBottom:18 }}>
+                  <div style={{ fontWeight:600, marginBottom:8, color:'#1a1a1a' }}>Top 3 Priorities</div>
+                  <ol style={{ paddingLeft:20, fontSize:14, color:'var(--text)' }}>
+                    {closingSummary.topPriorities.map((p, i) => <li key={i} style={{ marginBottom:6 }}>{p}</li>)}
+                  </ol>
+                </div>
+              )}
+              {closingSummary.nextMilestone && (
+                <div>
+                  <div style={{ fontWeight:600, marginBottom:6, color:'#1a1a1a' }}>Your Next Milestone</div>
+                  <div style={{ fontSize:14, color:'var(--text)', fontStyle:'italic' }}>{closingSummary.nextMilestone}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
 
@@ -1082,16 +1169,30 @@ function CoachChat({ form, diagnosis }) {
 
         {error && <div className="error-box" style={{ margin:'0 28px 16px' }}>{error}</div>}
 
-        <div className="chat-input-row">
-          <input
-            placeholder="Ask about your story…"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-            disabled={loading}
-          />
-          <button className="btn-send" onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>→</button>
-        </div>
+        {!sessionEnded && (
+          <div className="chat-input-row">
+            <input
+              placeholder="Ask about your story…"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+              disabled={loading}
+            />
+            <button className="btn-send" onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>→</button>
+          </div>
+        )}
+
+        {sessionEnded && (
+          <div style={{ padding:'20px 28px', borderTop:'1px solid var(--border)', textAlign:'center' }}>
+            <p style={{ fontSize:14, color:'var(--muted)', marginBottom:14 }}>
+              Your story diagnosis session is complete. Ready to dig deeper?
+            </p>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}
+              style={{ width:'auto', minWidth:220 }}>
+              Start a New Diagnosis
+            </button>
+          </div>
+        )}
       </div>
 
       {showPaywall && <Paywall onUnlock={() => { setUnlocked(true); setShowPaywall(false); }} />}

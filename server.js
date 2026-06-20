@@ -264,20 +264,53 @@ Score guide: 80–100 = strong commercial/literary potential, move forward confi
 }
 
 async function handleCoach(req, res) {
-  const { messages, storyContext } = await readBody(req);
+  const { messages, storyContext, isWrapup, exchangesLeft } = await readBody(req);
 
-  const system = `You are a sharp, encouraging writing coach who has read the writer's story diagnosis. You know their genre, premise, protagonist, conflict, stakes, and theme. You give specific, practical advice tailored to THEIR story — never generic writing tips.
+  let system = `You are a sharp, encouraging writing coach who has read the writer's story diagnosis. You know their genre, premise, protagonist, conflict, stakes, and theme. You give specific, practical advice tailored to THEIR story — never generic writing tips.
 
 Story context:
 ${JSON.stringify(storyContext, null, 2)}
 
 Be direct and warm. Use the writer's specific details in every answer. Keep responses focused — under 300 words unless a longer answer genuinely serves them. If they ask something unrelated to writing or their story, gently steer back.`;
 
+  if (isWrapup) {
+    system += `\n\nIMPORTANT: This consultation session is wrapping up. The writer has ${exchangesLeft} exchange${exchangesLeft === 1 ? '' : 's'} remaining with you. Begin guiding the conversation toward conclusion. Help them consolidate what they've learned, identify their single most important next action, and prepare to step away from coaching and into the work.`;
+  }
+
   try {
     const text = await callClaude(messages, system, 1000);
     sendJSON(res, 200, { reply: text });
   } catch (e) {
     console.error('Coach error:', e.message);
+    sendJSON(res, 500, { error: e.message });
+  }
+}
+
+async function handleClosingSummary(req, res) {
+  const { messages, storyContext } = await readBody(req);
+
+  const system = `You are a senior story analyst writing a closing summary for a writer who has just completed a 20-exchange coaching consultation about their story. You have read the entire conversation.
+
+Story context:
+${JSON.stringify(storyContext, null, 2)}
+
+Synthesize the consultation into a concrete action plan. Respond ONLY with a valid JSON object — no markdown, no code fences, no preamble:
+
+{
+  "actionPlan": "<2-3 sentences summarizing the writer's clear path forward, based on what was discussed>",
+  "topPriorities": ["<priority 1 — concrete and specific>", "<priority 2>", "<priority 3>"],
+  "nextMilestone": "<one specific, achievable milestone they should aim for next — e.g., 'Complete a detailed outline of Act 1 in the next two weeks' or 'Draft your protagonist's character bible before writing chapter 1'>"
+}
+
+Be specific to THEIR story and the actual conversation. No generic writing advice.`;
+
+  try {
+    const text = await callClaude(messages, system, 800);
+    const clean = text.replace(/```json|```/g, '').trim();
+    const summary = JSON.parse(clean);
+    sendJSON(res, 200, { summary });
+  } catch (e) {
+    console.error('Closing summary error:', e.message);
     sendJSON(res, 500, { error: e.message });
   }
 }
@@ -347,10 +380,11 @@ const server = http.createServer(async (req, res) => {
 
   const url = req.url.split('?')[0];
 
-  if (req.method === 'POST' && url === '/api/diagnose')      return handleDiagnose(req, res);
-  if (req.method === 'POST' && url === '/api/coach')         return handleCoach(req, res);
-  if (req.method === 'POST' && url === '/api/request-code')  return handleRequestCode(req, res);
-  if (req.method === 'POST' && url === '/api/verify-code')   return handleVerifyCode(req, res);
+  if (req.method === 'POST' && url === '/api/diagnose')          return handleDiagnose(req, res);
+  if (req.method === 'POST' && url === '/api/coach')             return handleCoach(req, res);
+  if (req.method === 'POST' && url === '/api/closing-summary')   return handleClosingSummary(req, res);
+  if (req.method === 'POST' && url === '/api/request-code')      return handleRequestCode(req, res);
+  if (req.method === 'POST' && url === '/api/verify-code')       return handleVerifyCode(req, res);
 
   if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
     return sendFile(res, path.join(__dirname, 'index.html'), 'text/html; charset=utf-8');
