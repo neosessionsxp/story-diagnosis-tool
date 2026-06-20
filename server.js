@@ -314,14 +314,14 @@ async function handleVerifyCode(req, res) {
 
     // Find matching row (email + code + not used)
     let matchRow = -1;
-    for (let i = 1; i < rows.length; i++) {
+    for (let i = 0; i < rows.length; i++) {
       const [rowEmail, rowCode, , rowUsed] = rows[i];
       if (
         rowEmail && rowEmail.toLowerCase() === email.toLowerCase() &&
         rowCode === code &&
         rowUsed !== 'true'
       ) {
-        matchRow = i + 1; // Sheets rows are 1-indexed, +1 for header
+        matchRow = i + 1; // Sheets rows are 1-indexed
         break;
       }
     }
