@@ -193,7 +193,13 @@ async function handleDiagnose(request, env) {
     '\nTheme: ' + body.theme;
 
   try {
-    const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 1300);
+    // 1800, not 1300. The 1300 value came from the old Railway server.js and NOTES
+    // treated it as the "correct" pre-migration number, but it truncates this schema
+    // mid-string and JSON.parse then throws "Unterminated string in JSON" at the user.
+    // The diagnose payload (verdict + 3 strengths + 3 critical issue/detail/fix triples
+    // + greenLight + 3 comparables + 3 nextSteps) needs the headroom. Do not lower
+    // without measuring real completions first.
+    const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 1800);
     const clean = text.replace(/```json|```/g, '').trim();
     return json(200, JSON.parse(clean));
   } catch (e) {
@@ -216,7 +222,9 @@ async function handleCoach(request, env) {
   }
 
   try {
-    const text = await callClaude(env, body.messages, system, 750);
+    // 1000, not 750. Coach returns prose so truncation degrades quietly rather than
+    // throwing, which makes it the easy one to under-size without noticing.
+    const text = await callClaude(env, body.messages, system, 1000);
     return json(200, { reply: text });
   } catch (e) {
     return json(500, { error: e.message });
@@ -237,7 +245,9 @@ async function handleClosingSummary(request, env) {
     'Be specific to THEIR story and the actual conversation. No generic writing advice.';
 
   try {
-    const text = await callClaude(env, body.messages, system, 600);
+    // 800, not 600 — same reasoning as handleDiagnose. This endpoint also JSON.parses
+    // its result, so a truncated completion surfaces as a parse error, not a short answer.
+    const text = await callClaude(env, body.messages, system, 800);
     const clean = text.replace(/```json|```/g, '').trim();
     return json(200, { summary: JSON.parse(clean) });
   } catch (e) {
