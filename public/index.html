@@ -670,6 +670,36 @@
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback } = React;
 
+// ── Inline markdown ─────────────────────────────────────────────────────────
+// Claude writes **bold** and *italic* inside its JSON string values and coach
+// replies. Rendering those with plain {text} showed the raw asterisks to users,
+// so every emphasis the model intended arrived looking like a typo.
+//
+// Returns React ELEMENTS, not an HTML string — no dangerouslySetInnerHTML, so
+// there is no escaping burden and no XSS path even though user-authored text
+// (their own chat messages) flows through here too.
+//
+// Deliberately only bold and italic. Headings/lists/links are not worth the
+// parser, and the model doesn't emit them here.
+//
+// The inner [^\s*] guards stop emphasis from opening or closing on whitespace,
+// which is what keeps a stray asterisk from pairing with a later unrelated one
+// ("a * note ... 3*4" must not italicise the span between them). No lookbehind,
+// so this is safe on older Safari.
+const MD = /(\*\*[^\s*](?:[^*\n]*[^\s*])?\*\*|\*[^\s*](?:[^*\n]*[^\s*])?\*)/g;
+function fmt(text) {
+  if (typeof text !== 'string') return text;
+  return text.split(MD).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+}
+
 // ── Score Ring ──────────────────────────────────────────────────────────────
 function ScoreRing({ score }) {
   const r = 58, cx = 70, cy = 70;
@@ -835,13 +865,13 @@ function DiagnosisResults({ data, form, onCoach }) {
   return (
     <div className="card">
       <ScoreRing score={data.score} />
-      <p className="verdict">"{data.verdict}"</p>
+      <p className="verdict">"{fmt(data.verdict)}"</p>
       <hr className="divider" />
 
       <div className="result-section">
         <div className="section-heading">What's Working</div>
         <div className="tag-list">
-          {data.whatsWorking.map((w, i) => <span key={i} className="tag green">{w}</span>)}
+          {data.whatsWorking.map((w, i) => <span key={i} className="tag green">{fmt(w)}</span>)}
         </div>
       </div>
 
@@ -849,29 +879,29 @@ function DiagnosisResults({ data, form, onCoach }) {
         <div className="section-heading">Critical Issues & Fixes</div>
         {data.critical.map((c, i) => (
           <div key={i} className="issue-card">
-            <div className="issue-title">{c.issue}</div>
-            <div className="issue-detail">{c.detail}</div>
-            <div className="fix">{c.fix}</div>
+            <div className="issue-title">{fmt(c.issue)}</div>
+            <div className="issue-detail">{fmt(c.detail)}</div>
+            <div className="fix">{fmt(c.fix)}</div>
           </div>
         ))}
       </div>
 
       <div className="result-section">
         <div className="section-heading">Green-Light Assessment</div>
-        <div className="green-light-box">{data.greenLight}</div>
+        <div className="green-light-box">{fmt(data.greenLight)}</div>
       </div>
 
       <div className="result-section">
         <div className="section-heading">Comparable Titles</div>
         <div className="tag-list">
-          {data.comparables.map((c, i) => <span key={i} className="tag">{c}</span>)}
+          {data.comparables.map((c, i) => <span key={i} className="tag">{fmt(c)}</span>)}
         </div>
       </div>
 
       <div className="result-section">
         <div className="section-heading">Next Steps</div>
         <ol className="steps-list">
-          {data.nextSteps.map((s, i) => <li key={i}>{s}</li>)}
+          {data.nextSteps.map((s, i) => <li key={i}>{fmt(s)}</li>)}
         </ol>
       </div>
 
@@ -1149,7 +1179,7 @@ function CoachChat({ form, diagnosis }) {
           {messages.map((m, i) => (
             <div key={i} className={`chat-msg ${m.role}`}>
               <div className="msg-avatar">{m.role === 'user' ? 'U' : '✍'}</div>
-              <div className="msg-bubble">{m.content}</div>
+              <div className="msg-bubble">{fmt(m.content)}</div>
             </div>
           ))}
           {loading && (
@@ -1176,21 +1206,21 @@ function CoachChat({ form, diagnosis }) {
               {closingSummary.actionPlan && (
                 <div style={{ marginBottom:18 }}>
                   <div style={{ fontWeight:600, marginBottom:6, color:'#1A1A2E' }}>Your Action Plan</div>
-                  <div style={{ fontSize:14, color:'var(--text)' }}>{closingSummary.actionPlan}</div>
+                  <div style={{ fontSize:14, color:'var(--text)' }}>{fmt(closingSummary.actionPlan)}</div>
                 </div>
               )}
               {closingSummary.topPriorities && (
                 <div style={{ marginBottom:18 }}>
                   <div style={{ fontWeight:600, marginBottom:8, color:'#1A1A2E' }}>Top 3 Priorities</div>
                   <ol style={{ paddingLeft:20, fontSize:14, color:'var(--text)' }}>
-                    {closingSummary.topPriorities.map((p, i) => <li key={i} style={{ marginBottom:6 }}>{p}</li>)}
+                    {closingSummary.topPriorities.map((p, i) => <li key={i} style={{ marginBottom:6 }}>{fmt(p)}</li>)}
                   </ol>
                 </div>
               )}
               {closingSummary.nextMilestone && (
                 <div>
                   <div style={{ fontWeight:600, marginBottom:6, color:'#1A1A2E' }}>Your Next Milestone</div>
-                  <div style={{ fontSize:14, color:'var(--text)', fontStyle:'italic' }}>{closingSummary.nextMilestone}</div>
+                  <div style={{ fontSize:14, color:'var(--text)', fontStyle:'italic' }}>{fmt(closingSummary.nextMilestone)}</div>
                 </div>
               )}
             </div>
