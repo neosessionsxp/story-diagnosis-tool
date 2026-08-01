@@ -193,7 +193,7 @@ async function handleDiagnose(request, env) {
     '\nTheme: ' + body.theme;
 
   try {
-    const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 1800);
+    const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 1300);
     const clean = text.replace(/```json|```/g, '').trim();
     return json(200, JSON.parse(clean));
   } catch (e) {
@@ -216,7 +216,7 @@ async function handleCoach(request, env) {
   }
 
   try {
-    const text = await callClaude(env, body.messages, system, 1000);
+    const text = await callClaude(env, body.messages, system, 750);
     return json(200, { reply: text });
   } catch (e) {
     return json(500, { error: e.message });
@@ -237,7 +237,7 @@ async function handleClosingSummary(request, env) {
     'Be specific to THEIR story and the actual conversation. No generic writing advice.';
 
   try {
-    const text = await callClaude(env, body.messages, system, 800);
+    const text = await callClaude(env, body.messages, system, 600);
     const clean = text.replace(/```json|```/g, '').trim();
     return json(200, { summary: JSON.parse(clean) });
   } catch (e) {

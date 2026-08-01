@@ -436,6 +436,12 @@
   }
   .price-badge .dollar { font-size: 24px; color: var(--amber); font-weight: 700; font-family: 'PT Sans', sans-serif; }
   .price-badge .cents { font-size: 14px; color: var(--muted); }
+  .credit-note {
+    font-size: 13px; line-height: 1.6; color: var(--muted);
+    text-align: center; margin: 0 0 18px 0; padding: 10px 14px;
+    background: rgba(0,0,0,0.03); border-radius: 6px;
+  }
+  .credit-note strong { color: var(--text, #1a1a1a); font-weight: 600; }
   .paywall-features {
     list-style: none;
     display: flex;
@@ -930,7 +936,7 @@ function Paywall({ onUnlock }) {
       <h3>Unlock Your Writing Coach</h3>
       <p>You've used your free coaching response.<br />Get unlimited coaching on this story for a one-time fee.</p>
       <div className="price-badge">
-        <span className="dollar">$12</span>
+        <span className="dollar">$19</span>
         <span className="cents">USD · one-time</span>
       </div>
       <ul className="paywall-features">
@@ -939,17 +945,25 @@ function Paywall({ onUnlock }) {
         <li>Closing session summary with action plan & next milestone</li>
         <li>Tailored to your specific premise and genre</li>
       </ul>
+      <p className="credit-note">
+        Your <strong>$19</strong> is credited toward the Manuscript Assessment Tool
+        if you upgrade within 30 days.
+      </p>
 
       {step === 'pay' && (
         <>
           <div className="unlock-row" style={{ flexDirection:'column', gap:16, alignItems:'center' }}>
-            <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
-              <input type="hidden" name="cmd" value="_s-xclick" />
-              <input type="hidden" name="hosted_button_id" value="5343AJGX52X52" />
-              <button type="submit" className="btn btn-primary" style={{ width:'auto', minWidth:220 }}>
-                Pay $12 via PayPal
-              </button>
-            </form>
+            {/* No-code hosted button. The legacy cgi-bin/webscr + _s-xclick
+                endpoint cannot resolve these and errors out — use the NCP link,
+                same mechanism as the Manuscript Assessment Tool. */}
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ width:'auto', minWidth:220 }}
+              onClick={() => window.open('https://www.paypal.com/ncp/payment/5343AJGX52X52', '_blank', 'noopener')}
+            >
+              Pay $19 via PayPal
+            </button>
             <div style={{ width:'100%', maxWidth:320 }}>
               <div style={{ fontSize:13, color:'var(--muted)', marginBottom:8, textAlign:'left' }}>
                 After paying, enter your PayPal email to receive your unlock code:
