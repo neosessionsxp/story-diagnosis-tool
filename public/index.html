@@ -700,6 +700,39 @@ function fmt(text) {
   });
 }
 
+// ── Session persistence ─────────────────────────────────────────────────────
+// Everything used to live in React state only, so a refresh — or a browser tab
+// reload, or a back-navigation — silently destroyed a paid 20-exchange coaching
+// session with no way to recover it. Now the diagnosis, the form, and the whole
+// conversation survive a reload.
+//
+// The unlock is deliberately NOT stored as a boolean. A localStorage flag like
+// {unlocked:true} would be a one-line paywall bypass for anyone who opens
+// devtools. Instead we keep the email+code the buyer already entered and
+// re-verify them against /api/verify-code on load, so the server stays the
+// authority. Worst case the check fails and they just see the paywall again.
+//
+// Wrapped in try/catch throughout: Safari private browsing throws on
+// localStorage access, and a storage failure must never take the tool down.
+const SS_KEY = 'sdt_session_v1';
+
+function ssLoad() {
+  try {
+    const raw = localStorage.getItem(SS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+
+function ssSave(patch) {
+  try {
+    localStorage.setItem(SS_KEY, JSON.stringify({ ...ssLoad(), ...patch }));
+  } catch (e) { /* private mode / quota — non-fatal, session just won't persist */ }
+}
+
+function ssClear() {
+  try { localStorage.removeItem(SS_KEY); } catch (e) {}
+}
+
 // ── Score Ring ──────────────────────────────────────────────────────────────
 function ScoreRing({ score }) {
   const r = 58, cx = 70, cy = 70;
@@ -953,7 +986,9 @@ function Paywall({ onUnlock }) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      onUnlock();
+      // Hand the verified credentials up so they can be stored and re-checked
+      // after a reload — this is what stops a refresh from voiding a purchase.
+      onUnlock({ email, code });
     } catch (e) {
       setError(e.message || 'Invalid code. Please try again.');
     } finally {
@@ -1071,20 +1106,47 @@ const MAX_EXCHANGES = 20;
 const WRAPUP_AT = 18; // Suggest wrap-up at 18, force at 20
 
 function CoachChat({ form, diagnosis }) {
-  const [messages, setMessages] = useState([]);
+  const saved = ssLoad();
+  const [messages, setMessages] = useState(saved.messages || []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [freeUsed, setFreeUsed] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
+  const [freeUsed, setFreeUsed] = useState(saved.freeUsed || false);
+  const [unlocked, setUnlocked] = useState(false); // set by re-verification below, never restored directly
   const [showPaywall, setShowPaywall] = useState(false);
   const [error, setError] = useState('');
-  const [sessionEnded, setSessionEnded] = useState(false);
-  const [closingSummary, setClosingSummary] = useState(null);
+  const [sessionEnded, setSessionEnded] = useState(saved.sessionEnded || false);
+  const [closingSummary, setClosingSummary] = useState(saved.closingSummary || null);
   const bottomRef = useRef(null);
 
   // Count exchanges: one exchange = one user msg + one assistant msg
   const exchangeCount = messages.filter(m => m.role === 'assistant').length;
   const remaining = MAX_EXCHANGES - exchangeCount;
+
+  // Re-verify a stored purchase against the server on load. This is what keeps a
+  // paying customer unlocked across a refresh without putting a forgeable
+  // "unlocked" flag in localStorage.
+  useEffect(() => {
+    const cred = ssLoad().cred;
+    if (!cred || !cred.email || !cred.code) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/verify-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cred.email, code: cred.code }),
+        });
+        const data = await res.json();
+        if (!cancelled && !data.error) setUnlocked(true);
+      } catch (e) { /* offline or server hiccup — they can re-enter the code */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist conversation state whenever it changes.
+  useEffect(() => {
+    ssSave({ messages, freeUsed, sessionEnded, closingSummary });
+  }, [messages, freeUsed, sessionEnded, closingSummary]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1265,25 +1327,46 @@ function CoachChat({ form, diagnosis }) {
         )}
       </div>
 
-      {showPaywall && <Paywall onUnlock={() => { setUnlocked(true); setShowPaywall(false); }} />}
+      {showPaywall && <Paywall onUnlock={(cred) => {
+        setUnlocked(true); setShowPaywall(false);
+        if (cred) ssSave({ cred });
+      }} />}
     </>
   );
 }
 
 // ── App ──────────────────────────────────────────────────────────────────────
 function App() {
-  const [phase, setPhase] = useState('form'); // 'form' | 'results' | 'coach'
-  const [diagnosis, setDiagnosis] = useState(null);
-  const [form, setForm] = useState(null);
+  // Restore synchronously on first render so there's no flash of the empty form.
+  // A saved phase is only honoured if the data that phase needs actually survived —
+  // otherwise a partial/corrupted save would render an empty container and look
+  // like the tool is broken. Falling back to 'form' is always safe.
+  const saved = ssLoad();
+  const restorable =
+    (saved.phase === 'coach'   && saved.form) ||
+    (saved.phase === 'results' && saved.diagnosis);
+  const [phase, setPhase] = useState(restorable ? saved.phase : 'form'); // 'form' | 'results' | 'coach'
+  const [diagnosis, setDiagnosis] = useState(saved.diagnosis || null);
+  const [form, setForm] = useState(saved.form || null);
 
   function handleResult(data, f) {
     setDiagnosis(data); setForm(f);
     setPhase('results');
+    ssSave({ phase: 'results', diagnosis: data, form: f });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleCoach() {
     setPhase('coach');
+    ssSave({ phase: 'coach' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Start over — wipes the saved session so the next visit is genuinely fresh.
+  function handleReset() {
+    if (!window.confirm('Start a new diagnosis? This clears your current story and coaching conversation.')) return;
+    ssClear();
+    setDiagnosis(null); setForm(null); setPhase('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1308,6 +1391,18 @@ function App() {
           <CoachChat form={form} diagnosis={diagnosis} />
         )}
       </div>
+
+      {phase !== 'form' && (
+        <div style={{ textAlign:'center', paddingBottom:40 }}>
+          <button
+            onClick={handleReset}
+            style={{ background:'none', border:'none', cursor:'pointer',
+                     color:'var(--muted)', fontSize:13, textDecoration:'underline' }}
+          >
+            Start a new diagnosis
+          </button>
+        </div>
+      )}
 
       <footer></footer>
     </>
