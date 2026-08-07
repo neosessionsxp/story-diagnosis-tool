@@ -4,6 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Story Diagnosis Tool — Tin House Press</title>
+<!-- GA4: fires from this Worker's own origin since it's loaded cross-origin
+     inside a tinhousepress.com iframe — the parent page's analytics can't see
+     into an iframe, so this tool needs its own tag to report funnel events. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-DB88HFMM8D"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-DB88HFMM8D');
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -809,6 +819,7 @@ function DiagnosisForm({ onResult }) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      if (window.gtag) gtag('event', 'sdt_free_diagnosis_completed', { genre: form.genre, stage: form.stage });
       onResult(data, form);
     } catch (e) {
       setError(e.message || 'Something went wrong. Please try again.');
@@ -986,6 +997,10 @@ function Paywall({ onUnlock }) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      // This is the closest thing to a real conversion signal SDT has —
+      // honor-system verification, but it's the moment a code actually checks
+      // out, so mark it as the key event in GA4.
+      if (window.gtag) gtag('event', 'sdt_unlock', { value: 19, currency: 'USD' });
       // Hand the verified credentials up so they can be stored and re-checked
       // after a reload — this is what stops a refresh from voiding a purchase.
       onUnlock({ email, code });
@@ -1025,7 +1040,10 @@ function Paywall({ onUnlock }) {
               type="button"
               className="btn btn-primary"
               style={{ width:'auto', minWidth:220 }}
-              onClick={() => window.open('https://www.paypal.com/ncp/payment/5343AJGX52X52', '_blank', 'noopener')}
+              onClick={() => {
+                if (window.gtag) gtag('event', 'sdt_paypal_click', { value: 19, currency: 'USD' });
+                window.open('https://www.paypal.com/ncp/payment/5343AJGX52X52', '_blank', 'noopener');
+              }}
             >
               Pay $19 via PayPal
             </button>
