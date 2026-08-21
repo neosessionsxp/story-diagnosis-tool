@@ -14,6 +14,120 @@
   gtag('js', new Date());
   gtag('config', 'G-DB88HFMM8D');
 </script>
+<!-- Marks the document as embedded BEFORE first paint, so the hero block below
+     can be hidden without a visible flash. The same headline, feature cards and
+     coaching offer now live in the WordPress page above this iframe, where
+     Google can actually index them and visitors have something to read while
+     the in-browser Babel compile boots the app.
+     Loaded directly (not in an iframe) the tool still shows its full hero. -->
+<script>if (window.parent !== window) document.documentElement.className += ' thp-embedded';</script>
+<script>
+/* ============================================================================
+   Tin House parent-frame relay (added Aug 2026)
+   Pairs with WPCode snippet 28382 "GA4 Tool Embed Event Relay" on
+   tinhousepress.com. The parent page's GA4 (GT-NM2F7H6M) cannot see into this
+   cross-origin iframe, so we postMessage the funnel events up to it. The
+   tool's own tag (G-DB88HFMM8D) keeps firing too, so this stream's history
+   stays continuous.
+
+   Plain <script>, not text/babel: this must be defined before Babel compiles
+   the app below, so the React components can call thpEvent() straight away.
+
+   Contract expected by the receiver:
+     { type: 'thp:event',  name: <allowlisted>, params: {…primitives, ≤10 keys} }
+     { type: 'thp:height', height: <int 200–20000> }
+   Allowlisted names: tool_view tool_start tool_complete checkout_click purchase
+   ========================================================================== */
+(function () {
+  // postMessage to a non-matching origin is a silent no-op, so listing both
+  // hosts is safe and avoids using '*' as the target origin.
+  var PARENT_ORIGINS = [
+    'https://tinhousepress.com',
+    'https://www.tinhousepress.com'
+  ];
+  var embedded = window.parent !== window;
+
+  function post(msg) {
+    if (!embedded) return;
+    for (var i = 0; i < PARENT_ORIGINS.length; i++) {
+      try { window.parent.postMessage(msg, PARENT_ORIGINS[i]); } catch (e) {}
+    }
+  }
+
+  window.thpEvent = function (name, params) {
+    params = params || {};
+    if (window.gtag) { try { gtag('event', name, params); } catch (e) {} }
+    post({ type: 'thp:event', name: name, params: params });
+  };
+
+  // Fires once per page, on the first real interaction with the form.
+  var started = false;
+  window.thpStart = function (how) {
+    if (started) return;
+    started = true;
+    window.thpEvent('tool_start', { method: how || 'unknown' });
+  };
+
+  // Auto-resize: tells the parent our real height so it can drop the fixed
+  // 1680px / 2500px CSS heights.
+  //
+  // Do NOT use documentElement.scrollHeight here. While the parent still forces
+  // the iframe to 1680px, the inner viewport is 1680px tall, so scrollHeight
+  // reports 1680 no matter how short the content is — the frame can then only
+  // ever grow, never shrink, and the magic numbers become permanent. Measuring
+  // the content wrapper breaks that feedback loop, so this works correctly
+  // whether or not the fixed-height CSS is still on the page.
+  var CONTENT_SELECTOR = '#root';
+  var lastH = 0;
+
+  function contentHeight() {
+    var el = document.querySelector(CONTENT_SELECTOR);
+    if (!el) return Math.ceil(document.documentElement.scrollHeight);
+    var r = el.getBoundingClientRect();
+    var top = r.top + (window.pageYOffset || 0);
+    var mb = parseFloat(window.getComputedStyle(el).marginBottom) || 0;
+    return Math.ceil(top + r.height + mb + 24); // 24px breathing room
+  }
+
+  function reportHeight() {
+    if (!embedded) return;
+    var h = contentHeight();
+    if (!h || h < 200 || h > 20000) return;
+    if (Math.abs(h - lastH) < 24) return;
+    lastH = h;
+    post({ type: 'thp:height', height: h });
+  }
+  window.thpHeight = reportHeight;
+
+  // Any typing or select-change in the app counts as a start, matching how
+  // GA4's automatic form_start behaves on the parent page.
+  function watchFormStart() {
+    var root = document.getElementById('root');
+    if (!root) return;
+    root.addEventListener('input', function () { window.thpStart('form_input'); }, true);
+    root.addEventListener('change', function () { window.thpStart('form_select'); }, true);
+  }
+
+  function startWatch() {
+    watchFormStart();
+    reportHeight();
+    if (typeof ResizeObserver === 'function') {
+      try { new ResizeObserver(reportHeight).observe(document.body); } catch (e) {}
+    }
+    window.addEventListener('resize', reportHeight, false);
+    // React mounts after Babel finishes compiling, well after DOMContentLoaded.
+    setTimeout(reportHeight, 300);
+    setTimeout(reportHeight, 1500);
+    setTimeout(reportHeight, 4000);
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    startWatch();
+  } else {
+    document.addEventListener('DOMContentLoaded', startWatch, false);
+  }
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -61,6 +175,18 @@
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
   }
+
+  /* Duplicated into the WordPress page — see the note in <head>. */
+  html.thp-embedded .embed-hide { display: none; }
+
+  /* The hero supplied ALL of this tool's top spacing (64px padding + 40px
+     margin) because .container below has zero top padding — unlike the
+     manuscript tool, where the hidden intro sits INSIDE a container that
+     already pads 3rem. Hiding the hero here would otherwise slam the phase
+     bar flush against the top edge of the iframe. Restore it explicitly.
+     getBoundingClientRect().height includes padding, so the auto-resize
+     still measures correctly. */
+  html.thp-embedded #root { padding-top: 40px; }
 
   /* ── HEADER ── */
   header {
@@ -820,6 +946,7 @@ function DiagnosisForm({ onResult }) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       if (window.gtag) gtag('event', 'sdt_free_diagnosis_completed', { genre: form.genre, stage: form.stage });
+      thpEvent('tool_complete', { genre: form.genre, stage: form.stage, tool: 'sdt' });
       onResult(data, form);
     } catch (e) {
       setError(e.message || 'Something went wrong. Please try again.');
@@ -1001,6 +1128,7 @@ function Paywall({ onUnlock }) {
       // honor-system verification, but it's the moment a code actually checks
       // out, so mark it as the key event in GA4.
       if (window.gtag) gtag('event', 'sdt_unlock', { value: 19, currency: 'USD' });
+      thpEvent('purchase', { value: 19, currency: 'USD', tool: 'sdt', transaction_id: 'sdt-' + code });
       // Hand the verified credentials up so they can be stored and re-checked
       // after a reload — this is what stops a refresh from voiding a purchase.
       onUnlock({ email, code });
@@ -1013,7 +1141,7 @@ function Paywall({ onUnlock }) {
 
   return (
     <div className="paywall">
-      <h3>Unlock Your Writing Coach</h3>
+      <h3>Continue your coaching now</h3>
       <p>You've used your free coaching response.<br />Get unlimited coaching on this story for a one-time fee.</p>
       <div className="price-badge">
         <span className="dollar">$19</span>
@@ -1042,6 +1170,7 @@ function Paywall({ onUnlock }) {
               style={{ width:'auto', minWidth:220 }}
               onClick={() => {
                 if (window.gtag) gtag('event', 'sdt_paypal_click', { value: 19, currency: 'USD' });
+                thpEvent('checkout_click', { value: 19, currency: 'USD', tool: 'sdt' });
                 window.open('https://www.paypal.com/ncp/payment/5343AJGX52X52', '_blank', 'noopener');
               }}
             >
@@ -1367,6 +1496,16 @@ function App() {
   const [diagnosis, setDiagnosis] = useState(saved.diagnosis || null);
   const [form, setForm] = useState(saved.form || null);
 
+  // App is mounted and interactive — the moment the parent page's page_view
+  // has been waiting on while Babel compiles.
+  useEffect(() => {
+    thpEvent('tool_view', { tool: 'sdt', phase: restorable ? saved.phase : 'form' });
+    thpHeight();
+  }, []);
+
+  // Every phase change swaps the whole view, so the frame needs a new height.
+  useEffect(() => { thpHeight(); }, [phase, diagnosis]);
+
   function handleResult(data, f) {
     setDiagnosis(data); setForm(f);
     setPhase('results');
@@ -1392,11 +1531,16 @@ function App() {
     <>
 
 
-      <div className="hero">
+      <div className="hero embed-hide">
         <div className="eyebrow">Story Diagnosis</div>
         <h1>Is your story <em>ready</em><br />to be written?</h1>
         <p>Get a clinical viability score, identify structural weaknesses, and unlock a writing coach who knows your story — before you write a single chapter.</p>
       </div>
+      {phase === 'form' && (
+        <p style={{ fontSize:13, color:'#999', textAlign:'center', margin:'0 0 8px' }}>
+          Answer a few questions about your premise to get your free diagnosis.
+        </p>
+      )}
 
       <PhaseBar phase={phase} />
 
