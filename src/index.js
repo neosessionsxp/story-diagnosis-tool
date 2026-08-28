@@ -164,7 +164,54 @@ async function callClaude(env, messages, systemPrompt, maxTokens) {
   return parsed.content[0].text;
 }
 
-async function handleDiagnose(request, env) {
+// ── Owner notification on free-tier use ──────────────────────────────────────
+// Sends the operator a copy of what a free-trial visitor submitted and the
+// diagnosis they were given. Off unless OWNER_EMAIL is set, so deploying this
+// changes nothing until that secret exists. Every failure is swallowed — this
+// is the operator's convenience and must never surface on the writer's screen.
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function notifyOwnerOfTrial(env, { fields, ip, diagnosis }) {
+  const to = env.OWNER_EMAIL;
+  if (!to || !env.RESEND_API_KEY) return;
+
+  const rows = [
+    ['Genre', fields.genre], ['Stage', fields.stage], ['Premise', fields.premise],
+    ['Protagonist', fields.protagonist], ['Conflict', fields.conflict],
+    ['Stakes', fields.stakes], ['Theme', fields.theme], ['Connection', ip],
+  ].map(function (r) {
+    return '<tr><td style="vertical-align:top;"><b>' + esc(r[0]) + '</b></td><td>' + esc(r[1] || '\u2014') + '</td></tr>';
+  }).join('');
+
+  const html =
+    '<div style="font-family:-apple-system,Segoe UI,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;">' +
+    '<h2 style="margin:0 0 4px 0;">Free diagnosis used \u2014 Story Diagnosis Tool</h2>' +
+    '<p style="color:#666;margin:0 0 20px 0;">' + esc(new Date().toUTCString()) + '</p>' +
+    '<table cellpadding="4" style="border-collapse:collapse;margin-bottom:24px;max-width:640px;">' + rows + '</table>' +
+    '<h3 style="margin:0 0 8px 0;">Diagnosis produced</h3>' +
+    '<pre style="white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:4px;font-size:12px;">' +
+      esc(JSON.stringify(diagnosis, null, 2)) + '</pre></div>';
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.RESEND_API_KEY },
+      body: JSON.stringify({
+        from: 'Tin House Press <' + (env.FROM_EMAIL || 'support@tinhousepress.com') + '>',
+        to: [to],
+        subject: 'Free diagnosis used \u2014 ' + (fields.genre || 'unknown genre'),
+        html: html,
+      }),
+    });
+  } catch (err) {
+    console.error('owner notification failed:', err.message);
+  }
+}
+
+async function handleDiagnose(request, env, ctx) {
   const body = await request.json();
 
   const system = 'You are a senior story analyst and developmental editor with 20+ years of experience evaluating manuscripts for major publishers. You give honest, precise, actionable diagnoses \u2014 not flattery. You understand commercial viability, genre conventions, and literary craft equally well.\n\n' +
@@ -201,7 +248,19 @@ async function handleDiagnose(request, env) {
     // without measuring real completions first.
     const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 1800);
     const clean = text.replace(/```json|```/g, '').trim();
-    return json(200, JSON.parse(clean));
+    const diagnosis = JSON.parse(clean);
+
+    // Fire-and-forget: the writer's result is already complete, and a Resend
+    // hiccup must not turn a successful diagnosis into an error on her screen.
+    if (ctx) {
+      ctx.waitUntil(notifyOwnerOfTrial(env, {
+        fields: body,
+        ip: request.headers.get('CF-Connecting-IP') || 'unknown',
+        diagnosis: diagnosis,
+      }));
+    }
+
+    return json(200, diagnosis);
   } catch (e) {
     return json(500, { error: e.message });
   }
@@ -363,7 +422,7 @@ async function handleVerifyCode(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS });
     }
@@ -372,7 +431,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === 'POST') {
-      if (path === '/api/diagnose')        return handleDiagnose(request, env);
+      if (path === '/api/diagnose')        return handleDiagnose(request, env, ctx);
       if (path === '/api/coach')           return handleCoach(request, env);
       if (path === '/api/closing-summary') return handleClosingSummary(request, env);
       if (path === '/api/request-code')    return handleRequestCode(request, env);
