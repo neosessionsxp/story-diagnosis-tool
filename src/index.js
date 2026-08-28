@@ -207,16 +207,64 @@ async function handleDiagnose(request, env) {
   }
 }
 
+/**
+ * Prepare the coach conversation for prompt caching.
+ *
+ * A consultation runs up to 20 exchanges and the whole history is resent on
+ * every one of them, so the history — not the system prompt — is what costs
+ * money here. Marking the end of the previous turn as a cache breakpoint lets
+ * each new exchange re-read everything before it at roughly a tenth of the
+ * normal input price. Nothing else about the request changes.
+ *
+ * `extraInstruction`, when given, is appended to the final user message so it
+ * sits after the breakpoint and leaves the cached prefix intact.
+ *
+ * The cache entry lives 5 minutes by default. A writer who steps away mid-
+ * consultation simply pays full price on their next message — a miss is only
+ * ever a lost discount, never an error.
+ */
+function cacheableCoachMessages(rawMessages, extraInstruction) {
+  const messages = (rawMessages || []).map((m) => ({
+    role: m.role,
+    content: typeof m.content === 'string'
+      ? [{ type: 'text', text: m.content }]
+      : m.content.slice(),
+  }));
+  if (messages.length === 0) return messages;
+
+  if (extraInstruction) {
+    const last = messages[messages.length - 1];
+    last.content = last.content.concat([{ type: 'text', text: extraInstruction }]);
+  }
+
+  // Breakpoint on the turn before the new one: everything up to that point is
+  // byte-identical to the previous request, which is exactly what can be reused.
+  const prior = messages[messages.length - 2];
+  if (prior && prior.content.length > 0) {
+    const i = prior.content.length - 1;
+    prior.content[i] = Object.assign({}, prior.content[i], {
+      cache_control: { type: 'ephemeral' },
+    });
+  }
+  return messages;
+}
+
 async function handleCoach(request, env) {
   const body = await request.json();
 
-  let system = 'You are a sharp, encouraging writing coach who has read the writer\'s story diagnosis. You know their genre, premise, protagonist, conflict, stakes, and theme. You give specific, practical advice tailored to THEIR story \u2014 never generic writing tips.\n\n' +
+  const system = 'You are a sharp, encouraging writing coach who has read the writer\'s story diagnosis. You know their genre, premise, protagonist, conflict, stakes, and theme. You give specific, practical advice tailored to THEIR story \u2014 never generic writing tips.\n\n' +
     'Story context:\n' + JSON.stringify(body.storyContext, null, 2) + '\n\n' +
     'Be direct and warm. Use the writer\'s specific details in every answer. Keep responses focused \u2014 under 300 words unless a longer answer genuinely serves them. If they ask something unrelated to writing or their story, gently steer back.';
 
+  // The wrap-up instruction deliberately does NOT go on `system`. Prompt caching
+  // matches on an exact prefix and `system` sits at the front of it, so editing
+  // it on the final exchanges would discard the cached conversation at the point
+  // the conversation is longest and re-reading it costs the most. It rides on the
+  // last user message instead, which lands after the cache breakpoint.
+  let wrapup = null;
   if (body.isWrapup) {
     const n = body.exchangesLeft;
-    system += '\n\nIMPORTANT: This consultation session is wrapping up. The writer has ' + n +
+    wrapup = 'IMPORTANT: This consultation session is wrapping up. The writer has ' + n +
       ' exchange' + (n === 1 ? '' : 's') +
       ' remaining with you. Begin guiding the conversation toward conclusion. Help them consolidate what they have learned, identify their single most important next action, and prepare to step away from coaching and into the work.';
   }
@@ -224,7 +272,7 @@ async function handleCoach(request, env) {
   try {
     // 1000, not 750. Coach returns prose so truncation degrades quietly rather than
     // throwing, which makes it the easy one to under-size without noticing.
-    const text = await callClaude(env, body.messages, system, 1000);
+    const text = await callClaude(env, cacheableCoachMessages(body.messages, wrapup), system, 1000);
     return json(200, { reply: text });
   } catch (e) {
     return json(500, { error: e.message });
