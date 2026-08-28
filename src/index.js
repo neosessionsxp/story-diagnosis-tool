@@ -196,7 +196,7 @@ async function notifyOwnerOfTrial(env, { fields, ip, diagnosis }) {
       esc(JSON.stringify(diagnosis, null, 2)) + '</pre></div>';
 
   try {
-    await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.RESEND_API_KEY },
       body: JSON.stringify({
@@ -206,6 +206,12 @@ async function notifyOwnerOfTrial(env, { fields, ip, diagnosis }) {
         html: html,
       }),
     });
+    // Resend reports refusals (unverified sender, bad key, oversized body) as a
+    // non-2xx response, not a thrown error. Without this the notification could
+    // fail silently forever and look identical to working.
+    if (!res.ok) {
+      console.error('owner notification rejected by Resend:', res.status, await res.text());
+    }
   } catch (err) {
     console.error('owner notification failed:', err.message);
   }
