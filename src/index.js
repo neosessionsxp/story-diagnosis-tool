@@ -368,6 +368,51 @@ async function handleClosingSummary(request, env) {
   }
 }
 
+// Tell the owner that somebody said they paid.
+//
+// This endpoint issues an unlock code to anyone who types an email address —
+// nothing checks PayPal, and the paywall copy ("After paying, enter your PayPal
+// email to receive your unlock code") is the entire security model. Until
+// 2026-08-31 that was also invisible: an honest $19 buyer and a stranger
+// helping themselves produced exactly the same silence.
+//
+// This does not gate anything. It puts every claim in front of a human, so the
+// $19 can be checked against the PayPal transaction list while the claim is
+// still fresh.
+async function notifyOwnerOfUnlockClaim(env, email, ip) {
+  const to = env.OWNER_EMAIL;
+  if (!to || !env.RESEND_API_KEY) return;
+
+  const html =
+    '<div style="font-family:-apple-system,Segoe UI,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;">' +
+    '<h2 style="margin:0 0 4px 0;">Unlock code issued — Story Diagnosis Tool</h2>' +
+    '<p style="color:#666;margin:0 0 20px 0;">' + esc(new Date().toUTCString()) + '</p>' +
+    '<p style="background:#fdecea;padding:12px;border-radius:4px;margin:0 0 20px 0;color:#8b2016;">' +
+    '<b>Unverified.</b> This person clicked &ldquo;I&rsquo;ve paid&rdquo; and a code was emailed to them. ' +
+    'Nothing here confirms a payment. Search PayPal for this address to check the $19 arrived.</p>' +
+    '<table cellpadding="4" style="border-collapse:collapse;">' +
+    '<tr><td><b>Email</b></td><td>' + esc(email) + '</td></tr>' +
+    '<tr><td><b>Amount expected</b></td><td>$19</td></tr>' +
+    '<tr><td><b>Connection</b></td><td>' + esc(ip || '—') + '</td></tr>' +
+    '</table></div>';
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.RESEND_API_KEY },
+      body: JSON.stringify({
+        from: 'Tin House Press <' + (env.FROM_EMAIL || 'support@tinhousepress.com') + '>',
+        to: [to],
+        subject: 'Unlock code issued — UNVERIFIED — ' + email,
+        html: html,
+      }),
+    });
+    if (!res.ok) console.error('unlock-claim notification rejected:', res.status, await res.text());
+  } catch (e) {
+    console.error('unlock-claim notification failed:', e.message);
+  }
+}
+
 async function handleRequestCode(request, env) {
   try {
     const body = await request.json();
@@ -381,6 +426,10 @@ async function handleRequestCode(request, env) {
       email.toLowerCase(), code, new Date().toISOString(), 'false', 'story-diagnosis',
     ]);
     await sendUnlockEmail(env, email, code);
+
+    // Never lets an alerting failure turn a successful unlock into an error on
+    // the buyer's screen — she has her code either way.
+    await notifyOwnerOfUnlockClaim(env, email, request.headers.get('CF-Connecting-IP') || '');
 
     return json(200, { ok: true });
   } catch (e) {
