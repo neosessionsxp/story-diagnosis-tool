@@ -14,15 +14,20 @@ directory = "./public"
 #
 # `period` accepts only 10 or 60 seconds. These caps are deliberately loose
 # enough that no real writer will ever touch them.
+#
+# Measured 2026-09-09: this limiter is APPROXIMATE and per-datacentre, not an
+# exact counter. A burst of 30 requests was only blocked twice. It throttles
+# sustained hammering, which is the abuse case, but it is not a hard cap — the
+# real ceiling on loss is that Anthropic auto-reload stays OFF.
 
 [[unsafe.bindings]]
 name = "DIAGNOSE_LIMIT"
 type = "ratelimit"
 namespace_id = "1001"
-simple = { limit = 4, period = 60 }
+simple = { limit = 3, period = 60 }
 
 [[unsafe.bindings]]
 name = "COACH_LIMIT"
 type = "ratelimit"
 namespace_id = "1002"
-simple = { limit = 12, period = 60 }
+simple = { limit = 10, period = 60 }
