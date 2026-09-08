@@ -217,7 +217,38 @@ async function notifyOwnerOfTrial(env, { fields, ip, diagnosis }) {
   }
 }
 
+/**
+ * Per-IP rate limit for the endpoints that spend Anthropic credits.
+ *
+ * These endpoints take no sign-in by design — the free tier deliberately never
+ * asks who a writer is — which also means nothing stopped a script from calling
+ * them in a loop and draining the API balance. Cloudflare's native rate-limit
+ * binding closes that without a KV counter, so it does not touch the account's
+ * shared 1,000 KV writes/day.
+ *
+ * Fails OPEN: if the binding is missing (a local `wrangler dev` without the
+ * unsafe bindings, or a partial deploy) a real writer still gets her diagnosis.
+ * A rate limiter that breaks the tool is worse than one that misses an abuser.
+ */
+async function rateLimited(limiter, request) {
+  if (!limiter) return null;
+  try {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await limiter.limit({ key: ip });
+    if (success) return null;
+  } catch (err) {
+    console.error('rate limiter failed open:', err.message);
+    return null;
+  }
+  return json(429, {
+    error: 'That is a lot of requests in a short time. Please wait a minute and try again.',
+  });
+}
+
 async function handleDiagnose(request, env, ctx) {
+  const blocked = await rateLimited(env.DIAGNOSE_LIMIT, request);
+  if (blocked) return blocked;
+
   const body = await request.json();
 
   const system = 'You are a senior story analyst and developmental editor with 20+ years of experience evaluating manuscripts for major publishers. You give honest, precise, actionable diagnoses \u2014 not flattery. You understand commercial viability, genre conventions, and literary craft equally well.\n\n' +
@@ -487,8 +518,14 @@ export default {
 
     if (request.method === 'POST') {
       if (path === '/api/diagnose')        return handleDiagnose(request, env, ctx);
-      if (path === '/api/coach')           return handleCoach(request, env);
-      if (path === '/api/closing-summary') return handleClosingSummary(request, env);
+      if (path === '/api/coach') {
+        const blocked = await rateLimited(env.COACH_LIMIT, request);
+        return blocked || handleCoach(request, env);
+      }
+      if (path === '/api/closing-summary') {
+        const blocked = await rateLimited(env.COACH_LIMIT, request);
+        return blocked || handleClosingSummary(request, env);
+      }
       if (path === '/api/request-code')    return handleRequestCode(request, env);
       if (path === '/api/verify-code')     return handleVerifyCode(request, env);
     }

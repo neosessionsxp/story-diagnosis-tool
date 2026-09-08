@@ -4,3 +4,25 @@ compatibility_date = "2026-01-15"
 
 [assets]
 directory = "./public"
+
+# ── Abuse protection (added 2026-09-09) ──────────────────────────────────────
+# The three AI endpoints below spend real Anthropic credits on every call and
+# require no sign-in, so an unattended script could drain the account. These are
+# Cloudflare's native rate-limit bindings: they cost nothing and, unlike a
+# KV-based counter, they consume none of the account's 1,000 KV writes/day —
+# which the Tin House and FluidScriptr workers already share.
+#
+# `period` accepts only 10 or 60 seconds. These caps are deliberately loose
+# enough that no real writer will ever touch them.
+
+[[unsafe.bindings]]
+name = "DIAGNOSE_LIMIT"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 4, period = 60 }
+
+[[unsafe.bindings]]
+name = "COACH_LIMIT"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 12, period = 60 }
