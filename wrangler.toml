@@ -2,6 +2,13 @@ name = "story-diagnosis-tool"
 main = "src/index.js"
 compatibility_date = "2026-01-15"
 
+# Run the worker in the US, not at the visitor's nearest Cloudflare city.
+# Anthropic refuses requests from Hong Kong ("403 Request not allowed"), and
+# visitors in Asia are sometimes routed through HKG. Confirmed 2026-09-30 on
+# MAT: every HKG request failed, every SIN request succeeded.
+[placement]
+region = "aws:us-east-1"
+
 [assets]
 directory = "./public"
 
