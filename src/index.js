@@ -153,15 +153,17 @@ async function callClaude(env, messages, systemPrompt, maxTokens) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5-5',
       max_tokens: maxTokens,
+      thinking: { type: 'between_tools' }, // Sonnet 5.5 thinks by default; off keeps output within max_tokens
       system: systemPrompt,
       messages: messages,
     }),
   });
   const parsed = await res.json();
   if (parsed.error) throw new Error(parsed.error.message);
-  return parsed.content[0].text;
+  const block = (parsed.content || []).find(b => b.type === 'text');
+  return block ? block.text : '';
 }
 
 // ── Owner notification on free-tier use ──────────────────────────────────────
@@ -282,8 +284,9 @@ async function handleDiagnose(request, env, ctx) {
     // mid-string and JSON.parse then throws "Unterminated string in JSON" at the user.
     // The diagnose payload (verdict + 3 strengths + 3 critical issue/detail/fix triples
     // + greenLight + 3 comparables + 3 nextSteps) needs the headroom. Do not lower
-    // without measuring real completions first.
-    const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 1800);
+    // without measuring real completions first. 2400 since the Sonnet 5.5 switch
+    // (2026-09-30): its tokenizer counts the same text as up to ~35% more tokens.
+    const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 2400);
     const clean = text.replace(/```json|```/g, '').trim();
     const diagnosis = JSON.parse(clean);
 
