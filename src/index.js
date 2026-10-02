@@ -280,7 +280,7 @@ async function handleDiagnose(request, env, ctx) {
   const userMsg = 'Please diagnose this story:\n\nGenre: ' + body.genre +
     '\nWriting Stage: ' + body.stage +
     '\nPremise: ' + body.premise + optional +
-    (optional ? '' : '\n\n(The writer gave only a premise. Diagnose from that, and note what extra detail would sharpen the diagnosis.)');
+    (optional ? '' : '\n\n(The writer gave only a premise, so diagnose from that alone. Reply with the JSON object only, nothing before or after it.)');
 
   try {
     // 1800, not 1300. The 1300 value came from the old Railway server.js and NOTES
@@ -291,7 +291,10 @@ async function handleDiagnose(request, env, ctx) {
     // without measuring real completions first. 2400 since the Sonnet 5.5 switch
     // (2026-09-30): its tokenizer counts the same text as up to ~35% more tokens.
     const text = await callClaude(env, [{ role: 'user', content: userMsg }], system, 2400);
-    const clean = text.replace(/```json|```/g, '').trim();
+    let clean = text.replace(/```json|```/g, '').trim();
+    // Keep only the outermost JSON object in case the model adds a stray note around it.
+    const first = clean.indexOf('{'), last = clean.lastIndexOf('}');
+    if (first > 0 || (last >= 0 && last < clean.length - 1)) clean = clean.slice(first, last + 1);
     const diagnosis = JSON.parse(clean);
 
     // Fire-and-forget: the writer's result is already complete, and a Resend
