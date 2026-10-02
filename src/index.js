@@ -270,13 +270,17 @@ async function handleDiagnose(request, env, ctx) {
 '}\n\n' +
 'Score guide: 80-100 = strong commercial/literary potential, move forward confidently; 60-79 = solid foundation, specific work needed; 40-59 = interesting premise but structural problems; below 40 = significant rethinking required.';
 
+  // Only genre, stage and premise are required; the rest sharpen the diagnosis
+  // but are optional, so leave out any the writer skipped rather than send blanks.
+  const optional = [
+    ['Protagonist', body.protagonist], ['Central Conflict', body.conflict],
+    ['Stakes', body.stakes], ['Theme', body.theme],
+  ].filter(function (r) { return r[1] && String(r[1]).trim(); })
+   .map(function (r) { return '\n' + r[0] + ': ' + r[1]; }).join('');
   const userMsg = 'Please diagnose this story:\n\nGenre: ' + body.genre +
     '\nWriting Stage: ' + body.stage +
-    '\nPremise: ' + body.premise +
-    '\nProtagonist: ' + body.protagonist +
-    '\nCentral Conflict: ' + body.conflict +
-    '\nStakes: ' + body.stakes +
-    '\nTheme: ' + body.theme;
+    '\nPremise: ' + body.premise + optional +
+    (optional ? '' : '\n\n(The writer gave only a premise. Diagnose from that, and note what extra detail would sharpen the diagnosis.)');
 
   try {
     // 1800, not 1300. The 1300 value came from the old Railway server.js and NOTES

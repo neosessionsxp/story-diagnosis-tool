@@ -881,7 +881,7 @@ function DiagnosisForm({ onResult }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const canSubmit = form.genre && form.stage && form.premise.length > 20 && form.protagonist.length > 10 && form.conflict.length > 10 && form.stakes.length > 10;
+  const canSubmit = form.genre && form.stage && form.premise.length > 20;
   async function submit() {
     setLoading(true);
     setError("");
@@ -933,7 +933,7 @@ function DiagnosisForm({ onResult }) {
       value: form.premise,
       onChange: (e) => set("premise", e.target.value)
     }
-  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Protagonist"), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "Who they are + what they want externally + what they need internally"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Protagonist ", React.createElement("span", { style: { textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--muted)" } }, "(optional \u2014 sharpens the diagnosis)")), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "Who they are + what they want externally + what they need internally"), /* @__PURE__ */ React.createElement(
     "textarea",
     {
       rows: 3,
@@ -941,7 +941,7 @@ function DiagnosisForm({ onResult }) {
       value: form.protagonist,
       onChange: (e) => set("protagonist", e.target.value)
     }
-  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Central Conflict"), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "The main force opposing your protagonist's goal"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Central Conflict ", React.createElement("span", { style: { textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--muted)" } }, "(optional \u2014 sharpens the diagnosis)")), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "The main force opposing your protagonist's goal"), /* @__PURE__ */ React.createElement(
     "textarea",
     {
       rows: 3,
@@ -949,7 +949,7 @@ function DiagnosisForm({ onResult }) {
       value: form.conflict,
       onChange: (e) => set("conflict", e.target.value)
     }
-  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Stakes"), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "What does your protagonist stand to lose? Internal + external"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Stakes ", React.createElement("span", { style: { textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--muted)" } }, "(optional \u2014 sharpens the diagnosis)")), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "What does your protagonist stand to lose? Internal + external"), /* @__PURE__ */ React.createElement(
     "textarea",
     {
       rows: 2,
@@ -957,7 +957,7 @@ function DiagnosisForm({ onResult }) {
       value: form.stakes,
       onChange: (e) => set("stakes", e.target.value)
     }
-  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Theme"), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "What is your story ultimately about \u2014 the human truth underneath the plot?"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("label", null, "Theme ", React.createElement("span", { style: { textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--muted)" } }, "(optional \u2014 sharpens the diagnosis)")), /* @__PURE__ */ React.createElement("div", { className: "hint" }, "What is your story ultimately about \u2014 the human truth underneath the plot?"), /* @__PURE__ */ React.createElement(
     "textarea",
     {
       rows: 2,
@@ -1310,7 +1310,7 @@ function App() {
     setPhase("form");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "hero embed-hide" }, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "Story Diagnosis"), /* @__PURE__ */ React.createElement("h1", null, "Is your story ", /* @__PURE__ */ React.createElement("em", null, "ready"), /* @__PURE__ */ React.createElement("br", null), "to be written?"), /* @__PURE__ */ React.createElement("p", null, "Get a clinical viability score, identify structural weaknesses, and unlock a writing coach who knows your story \u2014 before you write a single chapter.")), phase === "form" && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#999", textAlign: "center", margin: "0 0 8px" } }, "Answer a few questions about your premise to get your free diagnosis."), /* @__PURE__ */ React.createElement(PhaseBar, { phase }), /* @__PURE__ */ React.createElement("div", { className: "container" }, phase === "form" && /* @__PURE__ */ React.createElement(DiagnosisForm, { onResult: handleResult }), phase === "results" && diagnosis && /* @__PURE__ */ React.createElement(DiagnosisResults, { data: diagnosis, form, onCoach: handleCoach }), phase === "coach" && form && /* @__PURE__ */ React.createElement(CoachChat, { form, diagnosis })), phase !== "form" && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", paddingBottom: 40 } }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "hero embed-hide" }, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "Story Diagnosis"), /* @__PURE__ */ React.createElement("h1", null, "Is your story ", /* @__PURE__ */ React.createElement("em", null, "ready"), /* @__PURE__ */ React.createElement("br", null), "to be written?"), /* @__PURE__ */ React.createElement("p", null, "Get a clinical viability score, identify structural weaknesses, and unlock a writing coach who knows your story \u2014 before you write a single chapter.")), phase === "form" && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#999", textAlign: "center", margin: "0 0 8px" } }, "Pick a genre and stage, describe your premise, and get your free diagnosis."), /* @__PURE__ */ React.createElement(PhaseBar, { phase }), /* @__PURE__ */ React.createElement("div", { className: "container" }, phase === "form" && /* @__PURE__ */ React.createElement(DiagnosisForm, { onResult: handleResult }), phase === "results" && diagnosis && /* @__PURE__ */ React.createElement(DiagnosisResults, { data: diagnosis, form, onCoach: handleCoach }), phase === "coach" && form && /* @__PURE__ */ React.createElement(CoachChat, { form, diagnosis })), phase !== "form" && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", paddingBottom: 40 } }, /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: handleReset,
